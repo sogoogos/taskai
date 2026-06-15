@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Agenda from "./Agenda";
 import DayTimeline from "./DayTimeline";
+import Tasks from "./Tasks";
 
-type Tab = "list" | "timeline";
+type Tab = "list" | "timeline" | "tasks";
 
-/** 右パネル: 「リスト（直近2週間）」と「タイムライン（日別の時間軸）」をタブ切替 */
+/** 右パネル: 「リスト」「タイムライン」「タスク」をタブ切替 */
 export default function RightPanel({
   reloadSignal,
   onCalendarChanged,
@@ -35,11 +36,16 @@ export default function RightPanel({
       <div className="flex border-b border-[var(--border)]">
         {tabBtn("list", "リスト")}
         {tabBtn("timeline", "タイムライン")}
+        {tabBtn("tasks", "タスク")}
       </div>
-      {tab === "list" ? (
+      {tab === "list" && (
         <Agenda reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
-      ) : (
+      )}
+      {tab === "timeline" && (
         <DayTimeline reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
+      )}
+      {tab === "tasks" && (
+        <Tasks reloadSignal={reloadSignal} onTasksChanged={onCalendarChanged} />
       )}
     </aside>
   );

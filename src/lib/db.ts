@@ -69,6 +69,19 @@ const SCHEMA = `
     note         TEXT,
     updated_at   INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS tasks (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title        TEXT NOT NULL,
+    notes        TEXT,
+    status       TEXT NOT NULL DEFAULT 'todo',
+    due_date     TEXT,
+    sort_order   INTEGER NOT NULL DEFAULT 0,
+    created_at   INTEGER NOT NULL,
+    updated_at   INTEGER NOT NULL,
+    completed_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id);
 `;
 
 /** スキーマ適用（プロセス内で一度だけ実行、以降は同じPromiseを待つ） */
@@ -217,4 +230,132 @@ export async function setProfile(userId: number, profile: Profile): Promise<void
             updated_at = excluded.updated_at`,
     args: [userId, profile.homeAddress, profile.note, Date.now()],
   });
+}
+
+// --- タスク（ToDo）管理 ---
+
+export type TaskStatus = "todo" | "doing" | "done";
+
+export interface TaskRow {
+  id: number;
+  title: string;
+  notes: string | null;
+  status: TaskStatus;
+  dueDate: string | null; // 'YYYY-MM-DD'
+  createdAt: number;
+  updatedAt: number;
+  completedAt: number | null;
+}
+
+function normalizeStatus(v: unknown): TaskStatus {
+  return v === "doing" || v === "done" ? v : "todo";
+}
+
+function rowToTask(r: Row): TaskRow {
+  return {
+    id: Number(r.id),
+    title: String(r.title),
+    notes: asString(r.notes),
+    status: normalizeStatus(r.status),
+    dueDate: asString(r.due_date),
+    createdAt: Number(r.created_at),
+    updatedAt: Number(r.updated_at),
+    completedAt: asNumber(r.completed_at),
+  };
+}
+
+/** ユーザーのタスク一覧（未完了→完了、期日昇順、作成順）。 */
+export async function listTasks(userId: number): Promise<TaskRow[]> {
+  const c = await db();
+  const rs = await c.execute({
+    sql: `SELECT * FROM tasks
+           WHERE user_id = ?
+           ORDER BY CASE status WHEN 'done' THEN 1 ELSE 0 END,
+                    COALESCE(due_date, '9999-99-99'),
+                    sort_order, created_at`,
+    args: [userId],
+  });
+  return rs.rows.map(rowToTask);
+}
+
+export async function getTask(userId: number, id: number): Promise<TaskRow | undefined> {
+  const c = await db();
+  const rs = await c.execute({
+    sql: "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+    args: [id, userId],
+  });
+  return rs.rows[0] ? rowToTask(rs.rows[0]) : undefined;
+}
+
+export async function createTask(
+  userId: number,
+  input: { title: string; notes?: string | null; dueDate?: string | null; status?: TaskStatus },
+): Promise<TaskRow> {
+  const c = await db();
+  const now = Date.now();
+  const status = input.status ?? "todo";
+  const ins = await c.execute({
+    sql: `INSERT INTO tasks (user_id, title, notes, status, due_date, sort_order, created_at, updated_at, completed_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      userId,
+      input.title,
+      input.notes ?? null,
+      status,
+      input.dueDate ?? null,
+      now,
+      now,
+      now,
+      status === "done" ? now : null,
+    ],
+  });
+  const created = await getTask(userId, Number(ins.lastInsertRowid));
+  return created!;
+}
+
+/** 指定フィールドのみ更新。所有者(user_id)が一致する行のみ。 */
+export async function updateTask(
+  userId: number,
+  id: number,
+  fields: { title?: string; notes?: string | null; dueDate?: string | null; status?: TaskStatus },
+): Promise<TaskRow | undefined> {
+  const c = await db();
+  const sets: string[] = [];
+  const args: (string | number | null)[] = [];
+  if (fields.title !== undefined) {
+    sets.push("title = ?");
+    args.push(fields.title);
+  }
+  if (fields.notes !== undefined) {
+    sets.push("notes = ?");
+    args.push(fields.notes);
+  }
+  if (fields.dueDate !== undefined) {
+    sets.push("due_date = ?");
+    args.push(fields.dueDate);
+  }
+  if (fields.status !== undefined) {
+    sets.push("status = ?");
+    args.push(fields.status);
+    sets.push("completed_at = ?");
+    args.push(fields.status === "done" ? Date.now() : null);
+  }
+  if (sets.length === 0) return getTask(userId, id);
+  sets.push("updated_at = ?");
+  args.push(Date.now());
+  args.push(id, userId);
+  await c.execute({
+    sql: `UPDATE tasks SET ${sets.join(", ")} WHERE id = ? AND user_id = ?`,
+    args,
+  });
+  return getTask(userId, id);
+}
+
+export async function deleteTask(userId: number, id: number): Promise<boolean> {
+  const c = await db();
+  const rs = await c.execute({
+    sql: "DELETE FROM tasks WHERE id = ? AND user_id = ?",
+    args: [id, userId],
+  });
+  return rs.rowsAffected > 0;
 }

@@ -12,6 +12,13 @@ import {
 import { searchPlaces } from "./places";
 import { computeTravel, type TravelMode } from "./travel";
 import { searchEmails } from "./gmail";
+import {
+  listTasks,
+  createTask,
+  updateTask,
+  deleteTask,
+  type TaskStatus,
+} from "./db";
 
 /** account パラメータ共通の説明 */
 const ACCOUNT_DESC =
@@ -139,6 +146,63 @@ export const calendarTools: Anthropic.Tool[] = [
       required: ["origin", "destination"],
     },
   },
+  {
+    name: "list_tasks",
+    description:
+      "ユーザーの ToDo タスク一覧を取得する。『今日のタスクは?』『やることある?』『タスク見せて』などタスクの確認、または更新・完了のため対象を特定するときに呼ぶ。各タスクは id・title・status(todo/doing/done)・dueDate(YYYY-MM-DD or null) を持つ。これはカレンダー予定とは別物（時間の決まった予定は list_events、やること管理は list_tasks）。",
+    input_schema: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "create_task",
+    description:
+      "新しい ToDo タスクを作成する。『〇〇をやることに追加』『今日中に△△する』『タスクで覚えておいて』など、時間が決まっていない『やること』を頼まれたら呼ぶ。日時が明確な予定は create_event を使う。dueDate は期日（YYYY-MM-DD、『今日』なら本日の日付）。複数頼まれたら1つずつ呼ぶ。",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "タスク名" },
+        notes: { type: "string", description: "メモ（任意）" },
+        dueDate: { type: "string", description: "期日 YYYY-MM-DD（任意。今日なら本日の日付）" },
+        status: {
+          type: "string",
+          enum: ["todo", "doing", "done"],
+          description: "状態（既定 todo）",
+        },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "update_task",
+    description:
+      "既存タスクを更新する。『〇〇を完了にして』『△△は着手中』『期日を明日に』など。先に list_tasks で対象の id を特定する。status は todo(未着手)/doing(着手中)/done(完了)。変更するフィールドだけ渡す。",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "number", description: "対象タスクの id" },
+        title: { type: "string" },
+        notes: { type: "string" },
+        dueDate: { type: "string", description: "期日 YYYY-MM-DD（null 文字列で期日なしに）" },
+        status: { type: "string", enum: ["todo", "doing", "done"] },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_task",
+    description:
+      "タスクを削除する。破壊的操作なので実行前に対象を要約し確認を取ってから呼ぶ。先に list_tasks で id を特定する。",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "number", description: "対象タスクの id" },
+      },
+      required: ["id"],
+    },
+  },
 ];
 
 /** account メールから対象アカウントを解決（無ければ既定 = accounts[0]） */
@@ -175,6 +239,45 @@ export async function executeTool(
       destination: String(input.destination),
       mode: input.mode ? (String(input.mode) as TravelMode) : undefined,
     });
+  }
+
+  // タスク(ToDo)はカレンダー連携に依存しない。userId が必要。
+  if (name === "list_tasks" || name === "create_task" || name === "update_task" || name === "delete_task") {
+    if (ctx.userId === undefined) {
+      throw new Error("タスク機能を使うにはログインが必要です");
+    }
+    const userId = ctx.userId;
+    switch (name) {
+      case "list_tasks":
+        return await listTasks(userId);
+      case "create_task":
+        return await createTask(userId, {
+          title: String(input.title),
+          notes: input.notes !== undefined ? String(input.notes) : undefined,
+          dueDate: input.dueDate ? String(input.dueDate) : undefined,
+          status: input.status ? (String(input.status) as TaskStatus) : undefined,
+        });
+      case "update_task": {
+        const updated = await updateTask(userId, Number(input.id), {
+          title: input.title !== undefined ? String(input.title) : undefined,
+          notes: input.notes !== undefined ? String(input.notes) : undefined,
+          dueDate:
+            input.dueDate === undefined
+              ? undefined
+              : input.dueDate === null || input.dueDate === "null" || input.dueDate === ""
+                ? null
+                : String(input.dueDate),
+          status: input.status ? (String(input.status) as TaskStatus) : undefined,
+        });
+        if (!updated) throw new Error(`タスク id=${input.id} が見つかりません`);
+        return updated;
+      }
+      case "delete_task": {
+        const ok = await deleteTask(userId, Number(input.id));
+        if (!ok) throw new Error(`タスク id=${input.id} が見つかりません`);
+        return { deleted: true, id: Number(input.id) };
+      }
+    }
   }
 
   if (ctx.accounts.length === 0) {

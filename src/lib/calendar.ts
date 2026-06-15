@@ -12,6 +12,7 @@ export interface CalendarAccount {
 /** 複数アカウント横断のコンテキスト（accounts[0] = 既定アカウント） */
 export interface CalendarContext {
   accounts: CalendarAccount[];
+  userId?: number; // タスク(ToDo)ツール用。DBのユーザーID
 }
 
 /** チャットや UI に返す正規化済みの予定表現 */

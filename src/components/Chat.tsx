@@ -23,8 +23,15 @@ const SUGGESTIONS = [
   "今週の予定を教えて",
 ];
 
-// 予定を変更するツール（実行後にアジェンダを再読込する）
-const MUTATING_TOOLS = new Set(["create_event", "update_event", "delete_event"]);
+// 予定・タスクを変更するツール（実行後に右パネルを再読込する）
+const MUTATING_TOOLS = new Set([
+  "create_event",
+  "update_event",
+  "delete_event",
+  "create_task",
+  "update_task",
+  "delete_task",
+]);
 
 export default function Chat({
   defaultProvider = "claude",

@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
           throw new Error("連携中の Google アカウントがありません。再ログインしてください");
         }
         await runWithProvider(providerId, {
-          context: { accounts },
+          context: { accounts, userId: session.userId },
           system,
           history,
           onText: (text) => send("text", { text }),

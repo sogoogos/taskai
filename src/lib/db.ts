@@ -16,9 +16,19 @@ function getClient(): Client {
   if (!globalForDb.__taskaiDb) {
     const url = process.env.TURSO_DATABASE_URL ?? "file:./data/taskai.sqlite";
     if (url.startsWith("file:")) {
-      // ローカルファイルは親ディレクトリを用意
+      // 本番(Vercel等)はファイルDBが使えない。Turso の設定漏れを明示する。
+      if (process.env.VERCEL) {
+        throw new Error(
+          "DBが未設定です。Vercel の環境変数に TURSO_DATABASE_URL と TURSO_AUTH_TOKEN を設定してください（本番ではローカルファイルDBは使えません）。",
+        );
+      }
+      // ローカルは親ディレクトリを用意（読み取り専用FS等では握りつぶす）
       const filePath = url.slice("file:".length);
-      fs.mkdirSync(path.dirname(path.resolve(filePath)), { recursive: true });
+      try {
+        fs.mkdirSync(path.dirname(path.resolve(filePath)), { recursive: true });
+      } catch {
+        // ディレクトリ作成不可でも続行（createClient 側でエラーになればそちらで扱う）
+      }
       globalForDb.__taskaiDb = createClient({ url });
     } else {
       globalForDb.__taskaiDb = createClient({

@@ -13,10 +13,8 @@ fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 // 接続はモジュール読み込み時ではなく初回利用時に遅延生成して使い回す
 const globalForDb = globalThis as unknown as { __taskaiDb?: Database.Database };
 
-function init(): Database.Database {
-  const db = new Database(dbPath);
-  db.pragma("journal_mode = WAL");
-  db.pragma("busy_timeout = 5000"); // ロック競合時に待機
+/** スキーマ適用（CREATE TABLE IF NOT EXISTS は冪等）。新テーブル追加にも追従できるよう毎接続で実行。 */
+function ensureSchema(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,15 +48,29 @@ function init(): Database.Database {
       updated_at   INTEGER NOT NULL
     );
   `);
+}
+
+function init(): Database.Database {
+  const db = new Database(dbPath);
+  db.pragma("journal_mode = WAL");
+  db.pragma("busy_timeout = 5000"); // ロック競合時に待機
   return db;
 }
+
+// 接続ごとに一度だけスキーマ適用する（dev の HMR で接続が使い回されても新テーブルを作る）
+const schemaApplied = new WeakSet<Database.Database>();
 
 /** SQLite 接続を遅延取得（初回呼び出し時にオープン）。モジュール評価時には開かない。 */
 function getDb(): Database.Database {
   if (!globalForDb.__taskaiDb) {
     globalForDb.__taskaiDb = init();
   }
-  return globalForDb.__taskaiDb;
+  const db = globalForDb.__taskaiDb;
+  if (!schemaApplied.has(db)) {
+    ensureSchema(db);
+    schemaApplied.add(db);
+  }
+  return db;
 }
 
 export interface UserRow {

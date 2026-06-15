@@ -36,10 +36,13 @@ export default function SettingsButton() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ homeAddress, note }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `保存に失敗しました (${res.status})`);
+      }
       setSavedMsg("保存しました");
-    } catch {
-      setSavedMsg("保存に失敗しました");
+    } catch (err) {
+      setSavedMsg(err instanceof Error ? err.message : "保存に失敗しました");
     } finally {
       setSaving(false);
     }

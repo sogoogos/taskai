@@ -42,8 +42,8 @@ export async function POST(req: NextRequest) {
     content: m.content,
   }));
 
-  const accounts = calendarAccountsForIds(accountIdsOf(session));
-  const profile = getProfile(session.userId);
+  const accounts = await calendarAccountsForIds(accountIdsOf(session));
+  const profile = await getProfile(session.userId);
   const system = buildSystemPrompt({
     now: new Date(),
     email: session.email,

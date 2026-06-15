@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const tokens = await exchangeCodeForTokens(code);
-    const userId = upsertUser(tokens);
+    const userId = await upsertUser(tokens);
     const session = await getSession();
 
     if (state === "add" && session.userId) {

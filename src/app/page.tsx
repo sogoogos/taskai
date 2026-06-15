@@ -7,7 +7,9 @@ import SettingsButton from "@/components/SettingsButton";
 export default async function Home() {
   const session = await getSession();
   // Cookie が残っていても DB に主アカウントが無ければ未ログイン扱い（DBリセット時の保険）
-  const loggedIn = Boolean(session.userId && getUserById(session.userId));
+  const loggedIn = Boolean(
+    session.userId && (await getUserById(session.userId)),
+  );
   const defaultProvider = defaultProviderId();
 
   if (!loggedIn) {

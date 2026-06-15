@@ -1,76 +1,87 @@
-import Database from "better-sqlite3";
+import { createClient, type Client, type Row } from "@libsql/client";
 import fs from "node:fs";
 import path from "node:path";
 
-// SQLite ファイルの場所。デフォルトは ./data/taskai.sqlite
-const dbPath = process.env.DATABASE_PATH
-  ? path.resolve(process.env.DATABASE_PATH)
-  : path.join(process.cwd(), "data", "taskai.sqlite");
+/**
+ * libSQL クライアント。
+ * - ローカル: TURSO_DATABASE_URL 未設定なら file:./data/taskai.sqlite（既存SQLite互換）
+ * - 本番(Vercel等): TURSO_DATABASE_URL + TURSO_AUTH_TOKEN を設定（Turso）
+ */
+const globalForDb = globalThis as unknown as {
+  __taskaiDb?: Client;
+  __schemaReady?: Promise<void>;
+};
 
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-
-// Next.js の dev/build ではモジュールが複数回・複数ワーカーで評価されるため、
-// 接続はモジュール読み込み時ではなく初回利用時に遅延生成して使い回す
-const globalForDb = globalThis as unknown as { __taskaiDb?: Database.Database };
-
-/** スキーマ適用（CREATE TABLE IF NOT EXISTS は冪等）。新テーブル追加にも追従できるよう毎接続で実行。 */
-function ensureSchema(db: Database.Database): void {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      email         TEXT UNIQUE NOT NULL,
-      access_token  TEXT,
-      refresh_token TEXT,
-      expiry_date   INTEGER,
-      created_at    INTEGER NOT NULL,
-      updated_at    INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS conversations (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      title      TEXT,
-      created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS messages (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-      role            TEXT NOT NULL,
-      content         TEXT NOT NULL,
-      created_at      INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS profiles (
-      user_id      INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      home_address TEXT,
-      note         TEXT,
-      updated_at   INTEGER NOT NULL
-    );
-  `);
-}
-
-function init(): Database.Database {
-  const db = new Database(dbPath);
-  db.pragma("journal_mode = WAL");
-  db.pragma("busy_timeout = 5000"); // ロック競合時に待機
-  return db;
-}
-
-// 接続ごとに一度だけスキーマ適用する（dev の HMR で接続が使い回されても新テーブルを作る）
-const schemaApplied = new WeakSet<Database.Database>();
-
-/** SQLite 接続を遅延取得（初回呼び出し時にオープン）。モジュール評価時には開かない。 */
-function getDb(): Database.Database {
+function getClient(): Client {
   if (!globalForDb.__taskaiDb) {
-    globalForDb.__taskaiDb = init();
+    const url = process.env.TURSO_DATABASE_URL ?? "file:./data/taskai.sqlite";
+    if (url.startsWith("file:")) {
+      // ローカルファイルは親ディレクトリを用意
+      const filePath = url.slice("file:".length);
+      fs.mkdirSync(path.dirname(path.resolve(filePath)), { recursive: true });
+      globalForDb.__taskaiDb = createClient({ url });
+    } else {
+      globalForDb.__taskaiDb = createClient({
+        url,
+        authToken: process.env.TURSO_AUTH_TOKEN,
+      });
+    }
   }
-  const db = globalForDb.__taskaiDb;
-  if (!schemaApplied.has(db)) {
-    ensureSchema(db);
-    schemaApplied.add(db);
+  return globalForDb.__taskaiDb;
+}
+
+const SCHEMA = `
+  CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    email         TEXT UNIQUE NOT NULL,
+    access_token  TEXT,
+    refresh_token TEXT,
+    expiry_date   INTEGER,
+    created_at    INTEGER NOT NULL,
+    updated_at    INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS conversations (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title      TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS messages (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    role            TEXT NOT NULL,
+    content         TEXT NOT NULL,
+    created_at      INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS profiles (
+    user_id      INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    home_address TEXT,
+    note         TEXT,
+    updated_at   INTEGER NOT NULL
+  );
+`;
+
+/** スキーマ適用（プロセス内で一度だけ実行、以降は同じPromiseを待つ） */
+function ensureSchema(): Promise<void> {
+  if (!globalForDb.__schemaReady) {
+    globalForDb.__schemaReady = getClient()
+      .executeMultiple(SCHEMA)
+      .then(() => undefined);
   }
-  return db;
+  return globalForDb.__schemaReady;
+}
+
+async function db(): Promise<Client> {
+  await ensureSchema();
+  return getClient();
+}
+
+// libSQL の値を扱いやすい型へ
+function asString(v: unknown): string | null {
+  return v === null || v === undefined ? null : String(v);
+}
+function asNumber(v: unknown): number | null {
+  return v === null || v === undefined ? null : Number(v);
 }
 
 export interface UserRow {
@@ -83,59 +94,88 @@ export interface UserRow {
   updated_at: number;
 }
 
+function rowToUser(r: Row): UserRow {
+  return {
+    id: Number(r.id),
+    email: String(r.email),
+    access_token: asString(r.access_token),
+    refresh_token: asString(r.refresh_token),
+    expiry_date: asNumber(r.expiry_date),
+    created_at: Number(r.created_at),
+    updated_at: Number(r.updated_at),
+  };
+}
+
 /** Google から得たトークンとメールで users を upsert し、ユーザーIDを返す */
-export function upsertUser(params: {
+export async function upsertUser(params: {
   email: string;
   accessToken: string | null;
   refreshToken: string | null;
   expiryDate: number | null;
-}): number {
-  const db = getDb();
+}): Promise<number> {
+  const c = await db();
   const now = Date.now();
-  const existing = db
-    .prepare("SELECT * FROM users WHERE email = ?")
-    .get(params.email) as UserRow | undefined;
+  const existing = await c.execute({
+    sql: "SELECT id FROM users WHERE email = ?",
+    args: [params.email],
+  });
 
-  if (existing) {
-    db.prepare(
-      `UPDATE users
-         SET access_token = ?,
-             -- refresh_token は再同意時のみ返るため、無い場合は既存値を保持
-             refresh_token = COALESCE(?, refresh_token),
-             expiry_date = ?,
-             updated_at = ?
-       WHERE id = ?`,
-    ).run(
-      params.accessToken,
-      params.refreshToken,
-      params.expiryDate,
-      now,
-      existing.id,
-    );
-    return existing.id;
+  if (existing.rows.length > 0) {
+    const id = Number(existing.rows[0].id);
+    await c.execute({
+      sql: `UPDATE users
+              SET access_token = ?,
+                  refresh_token = COALESCE(?, refresh_token),
+                  expiry_date = ?,
+                  updated_at = ?
+            WHERE id = ?`,
+      args: [params.accessToken, params.refreshToken, params.expiryDate, now, id],
+    });
+    return id;
   }
 
-  const info = db
-    .prepare(
-      `INSERT INTO users (email, access_token, refresh_token, expiry_date, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
+  const ins = await c.execute({
+    sql: `INSERT INTO users (email, access_token, refresh_token, expiry_date, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [
       params.email,
       params.accessToken,
       params.refreshToken,
       params.expiryDate,
       now,
       now,
-    );
-  return Number(info.lastInsertRowid);
+    ],
+  });
+  return Number(ins.lastInsertRowid);
 }
 
-export function getUserById(id: number): UserRow | undefined {
-  const db = getDb();
-  return db.prepare("SELECT * FROM users WHERE id = ?").get(id) as
-    | UserRow
-    | undefined;
+export async function getUserById(id: number): Promise<UserRow | undefined> {
+  const c = await db();
+  const rs = await c.execute({ sql: "SELECT * FROM users WHERE id = ?", args: [id] });
+  return rs.rows[0] ? rowToUser(rs.rows[0]) : undefined;
+}
+
+/** トークンが更新されたとき DB に書き戻す */
+export async function updateUserTokens(
+  id: number,
+  tokens: { accessToken?: string | null; refreshToken?: string | null; expiryDate?: number | null },
+): Promise<void> {
+  const c = await db();
+  await c.execute({
+    sql: `UPDATE users
+            SET access_token = COALESCE(?, access_token),
+                refresh_token = COALESCE(?, refresh_token),
+                expiry_date = COALESCE(?, expiry_date),
+                updated_at = ?
+          WHERE id = ?`,
+    args: [
+      tokens.accessToken ?? null,
+      tokens.refreshToken ?? null,
+      tokens.expiryDate ?? null,
+      Date.now(),
+      id,
+    ],
+  });
 }
 
 export interface Profile {
@@ -143,49 +183,28 @@ export interface Profile {
   note: string | null;
 }
 
-/** ユーザーのプロフィールを取得（無ければ空） */
-export function getProfile(userId: number): Profile {
-  const db = getDb();
-  const row = db
-    .prepare("SELECT home_address, note FROM profiles WHERE user_id = ?")
-    .get(userId) as { home_address: string | null; note: string | null } | undefined;
+export async function getProfile(userId: number): Promise<Profile> {
+  const c = await db();
+  const rs = await c.execute({
+    sql: "SELECT home_address, note FROM profiles WHERE user_id = ?",
+    args: [userId],
+  });
+  const r = rs.rows[0];
   return {
-    homeAddress: row?.home_address ?? null,
-    note: row?.note ?? null,
+    homeAddress: r ? asString(r.home_address) : null,
+    note: r ? asString(r.note) : null,
   };
 }
 
-/** ユーザーのプロフィールを保存（upsert） */
-export function setProfile(userId: number, profile: Profile): void {
-  const db = getDb();
-  db.prepare(
-    `INSERT INTO profiles (user_id, home_address, note, updated_at)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT(user_id) DO UPDATE SET
-       home_address = excluded.home_address,
-       note = excluded.note,
-       updated_at = excluded.updated_at`,
-  ).run(userId, profile.homeAddress, profile.note, Date.now());
-}
-
-/** トークンが更新されたとき DB に書き戻す */
-export function updateUserTokens(
-  id: number,
-  tokens: { accessToken?: string | null; refreshToken?: string | null; expiryDate?: number | null },
-): void {
-  const db = getDb();
-  db.prepare(
-    `UPDATE users
-       SET access_token = COALESCE(?, access_token),
-           refresh_token = COALESCE(?, refresh_token),
-           expiry_date = COALESCE(?, expiry_date),
-           updated_at = ?
-     WHERE id = ?`,
-  ).run(
-    tokens.accessToken ?? null,
-    tokens.refreshToken ?? null,
-    tokens.expiryDate ?? null,
-    Date.now(),
-    id,
-  );
+export async function setProfile(userId: number, profile: Profile): Promise<void> {
+  const c = await db();
+  await c.execute({
+    sql: `INSERT INTO profiles (user_id, home_address, note, updated_at)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET
+            home_address = excluded.home_address,
+            note = excluded.note,
+            updated_at = excluded.updated_at`,
+    args: [userId, profile.homeAddress, profile.note, Date.now()],
+  });
 }

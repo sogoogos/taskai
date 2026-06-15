@@ -73,21 +73,21 @@ export function oauthClientForUser(user: UserRow): OAuth2Client {
     expiry_date: user.expiry_date ?? undefined,
   });
 
-  // googleapis がトークンを自動更新したら DB に保存
+  // googleapis がトークンを自動更新したら DB に保存（非同期・失敗してもログのみ）
   client.on("tokens", (tokens) => {
     updateUserTokens(user.id, {
       accessToken: tokens.access_token ?? null,
       refreshToken: tokens.refresh_token ?? null,
       expiryDate: tokens.expiry_date ?? null,
-    });
+    }).catch((e) => console.error("[google] token保存失敗:", e));
   });
 
   return client;
 }
 
 /** ユーザーID から Calendar クライアントを得る */
-export function calendarForUserId(userId: number): calendar_v3.Calendar {
-  const user = getUserById(userId);
+export async function calendarForUserId(userId: number): Promise<calendar_v3.Calendar> {
+  const user = await getUserById(userId);
   if (!user) throw new Error("ユーザーが見つかりません");
   if (!user.refresh_token && !user.access_token) {
     throw new Error("Google 連携が未完了です。再ログインしてください");
@@ -97,10 +97,10 @@ export function calendarForUserId(userId: number): calendar_v3.Calendar {
 }
 
 /** 複数アカウントID から CalendarAccount[] を生成（トークンが無いものはスキップ） */
-export function calendarAccountsForIds(ids: number[]): CalendarAccount[] {
+export async function calendarAccountsForIds(ids: number[]): Promise<CalendarAccount[]> {
   const accounts: CalendarAccount[] = [];
   for (const id of ids) {
-    const user = getUserById(id);
+    const user = await getUserById(id);
     if (!user || (!user.refresh_token && !user.access_token)) continue;
     const auth = oauthClientForUser(user);
     accounts.push({

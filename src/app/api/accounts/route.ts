@@ -11,11 +11,9 @@ export async function GET() {
     return NextResponse.json({ error: "未ログインです" }, { status: 401 });
   }
   const ids = accountIdsOf(session);
-  const accounts = ids
-    .map((id) => {
-      const u = getUserById(id);
-      return u ? { id: u.id, email: u.email, isPrimary: u.id === session.userId } : null;
-    })
-    .filter(Boolean);
+  const rows = await Promise.all(ids.map((id) => getUserById(id)));
+  const accounts = rows
+    .filter((u): u is NonNullable<typeof u> => Boolean(u))
+    .map((u) => ({ id: u.id, email: u.email, isPrimary: u.id === session.userId }));
   return NextResponse.json({ accounts });
 }

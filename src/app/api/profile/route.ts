@@ -9,7 +9,7 @@ export async function GET() {
   if (!session.userId) {
     return NextResponse.json({ error: "未ログインです" }, { status: 401 });
   }
-  return NextResponse.json({ profile: getProfile(session.userId) });
+  return NextResponse.json({ profile: await getProfile(session.userId) });
 }
 
 export async function PUT(req: NextRequest) {
@@ -26,7 +26,7 @@ export async function PUT(req: NextRequest) {
   const homeAddress = (body.homeAddress ?? "").trim() || null;
   const note = (body.note ?? "").trim() || null;
   try {
-    setProfile(session.userId, { homeAddress, note });
+    await setProfile(session.userId, { homeAddress, note });
   } catch (err) {
     const message = err instanceof Error ? err.message : "保存に失敗しました";
     console.error("[profile] save failed:", message);

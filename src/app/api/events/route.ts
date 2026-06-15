@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const accounts = calendarAccountsForIds(accountIdsOf(session));
+    const accounts = await calendarAccountsForIds(accountIdsOf(session));
     if (accounts.length === 0) {
       return NextResponse.json({ events: [] });
     }

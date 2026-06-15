@@ -54,6 +54,8 @@ export async function searchPlaces(params: {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
+    // 失敗理由（API未有効化/請求未設定/キー失効など）をサーバログに残す
+    console.error(`[places] ${res.status} ${text.slice(0, 300)}`);
     throw new Error(`Places API エラー: ${res.status} ${text.slice(0, 200)}`);
   }
 

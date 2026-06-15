@@ -56,6 +56,16 @@ function hhmm(iso?: string): string {
   );
 }
 
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+/** 選択日の「6月15日(月)」表記と曜日の色（土=青/日=赤） */
+function weekdayLabel(dateStr: string): { text: string; color: string } {
+  const d = new Date(`${dateStr}T00:00:00`);
+  const dow = d.getDay();
+  const color = dow === 0 ? "#f87171" : dow === 6 ? "#60a5fa" : "var(--text)";
+  return { text: `${d.getMonth() + 1}月${d.getDate()}日(${WEEKDAYS[dow]})`, color };
+}
+
 /** 重なるイベントを列に振り分ける（クラスタごとに最大同時数で列分割） */
 function layout(items: TimedItem[]): TimedItem[] {
   const out: TimedItem[] = [];
@@ -163,9 +173,19 @@ export default function DayTimeline({ reloadSignal = 0 }: { reloadSignal?: numbe
   for (let h = rangeStart / 60; h <= rangeEnd / 60; h++) hours.push(h);
 
   const isToday = date === todayStr();
+  const { text: dateLabel, color: dateColor } = weekdayLabel(date);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* 日付（曜日つき） */}
+      <div className="flex items-center justify-center gap-2 border-b border-[var(--border)] px-3 pt-2 text-sm font-semibold">
+        <span style={{ color: dateColor }}>{dateLabel}</span>
+        {isToday && (
+          <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-medium text-white">
+            今日
+          </span>
+        )}
+      </div>
       {/* 日付コントロール */}
       <div className="flex items-center justify-between gap-1 border-b border-[var(--border)] px-3 py-2">
         <button

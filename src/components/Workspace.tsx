@@ -36,7 +36,7 @@ export default function Workspace({
             (mobileView === "panel" ? "flex" : "hidden")
           }
         >
-          <RightPanel reloadSignal={reloadSignal} />
+          <RightPanel reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
         </div>
       </div>
 

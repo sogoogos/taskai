@@ -2,17 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { badgeColor } from "./colors";
-
-interface EventItem {
-  id: string;
-  summary: string;
-  start?: string;
-  end?: string;
-  allDay: boolean;
-  location?: string;
-  recurrence?: string[];
-  accountEmail?: string;
-}
+import type { CalendarEventItem } from "./event";
+import EventModal from "./EventModal";
 
 interface AccountItem {
   id: number;
@@ -20,7 +11,7 @@ interface AccountItem {
   isPrimary: boolean;
 }
 
-function formatWhen(ev: EventItem): string {
+function formatWhen(ev: CalendarEventItem): string {
   if (!ev.start) return "";
   if (ev.allDay) {
     return new Intl.DateTimeFormat("ja-JP", {
@@ -44,12 +35,19 @@ interface Warning {
   message: string;
 }
 
-export default function Agenda({ reloadSignal = 0 }: { reloadSignal?: number }) {
-  const [events, setEvents] = useState<EventItem[]>([]);
+export default function Agenda({
+  reloadSignal = 0,
+  onCalendarChanged,
+}: {
+  reloadSignal?: number;
+  onCalendarChanged?: () => void;
+}) {
+  const [events, setEvents] = useState<CalendarEventItem[]>([]);
   const [accounts, setAccounts] = useState<AccountItem[]>([]);
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<CalendarEventItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -142,9 +140,10 @@ export default function Agenda({ reloadSignal = 0 }: { reloadSignal?: number }) 
           <p className="text-xs text-[var(--muted)]">予定はありません</p>
         )}
         {events.map((ev) => (
-          <div
-            key={ev.id}
-            className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-2.5"
+          <button
+            key={`${ev.accountEmail}-${ev.id}`}
+            onClick={() => setSelected(ev)}
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-2.5 text-left transition hover:border-[var(--accent)]"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="text-sm font-medium">{ev.summary}</div>
@@ -165,9 +164,20 @@ export default function Agenda({ reloadSignal = 0 }: { reloadSignal?: number }) 
             {ev.location && (
               <div className="mt-0.5 text-xs text-[var(--muted)]">📍 {ev.location}</div>
             )}
-          </div>
+          </button>
         ))}
       </div>
+
+      {selected && (
+        <EventModal
+          event={selected}
+          onClose={() => setSelected(null)}
+          onChanged={() => {
+            load();
+            onCalendarChanged?.();
+          }}
+        />
+      )}
     </div>
   );
 }

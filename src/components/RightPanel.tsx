@@ -7,7 +7,13 @@ import DayTimeline from "./DayTimeline";
 type Tab = "list" | "timeline";
 
 /** 右パネル: 「リスト（直近2週間）」と「タイムライン（日別の時間軸）」をタブ切替 */
-export default function RightPanel({ reloadSignal }: { reloadSignal: number }) {
+export default function RightPanel({
+  reloadSignal,
+  onCalendarChanged,
+}: {
+  reloadSignal: number;
+  onCalendarChanged: () => void;
+}) {
   const [tab, setTab] = useState<Tab>("list");
 
   const tabBtn = (key: Tab, label: string) => (
@@ -31,9 +37,9 @@ export default function RightPanel({ reloadSignal }: { reloadSignal: number }) {
         {tabBtn("timeline", "タイムライン")}
       </div>
       {tab === "list" ? (
-        <Agenda reloadSignal={reloadSignal} />
+        <Agenda reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
       ) : (
-        <DayTimeline reloadSignal={reloadSignal} />
+        <DayTimeline reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
       )}
     </aside>
   );

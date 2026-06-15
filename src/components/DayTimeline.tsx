@@ -2,18 +2,10 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { badgeColor } from "./colors";
+import type { CalendarEventItem } from "./event";
+import EventModal from "./EventModal";
 
-interface EventItem {
-  id: string;
-  summary: string;
-  start?: string;
-  end?: string;
-  allDay: boolean;
-  location?: string;
-  accountEmail?: string;
-}
-
-interface TimedItem extends EventItem {
+interface TimedItem extends CalendarEventItem {
   s: number; // 当日0時からの開始分
   en: number; // 当日0時からの終了分
   col: number;
@@ -106,11 +98,18 @@ function layout(items: TimedItem[]): TimedItem[] {
   return out;
 }
 
-export default function DayTimeline({ reloadSignal = 0 }: { reloadSignal?: number }) {
+export default function DayTimeline({
+  reloadSignal = 0,
+  onCalendarChanged,
+}: {
+  reloadSignal?: number;
+  onCalendarChanged?: () => void;
+}) {
   const [date, setDate] = useState<string>(todayStr());
-  const [events, setEvents] = useState<EventItem[]>([]);
+  const [events, setEvents] = useState<CalendarEventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<CalendarEventItem | null>(null);
   // 現在時刻（0時からの分）。マウント後に設定して1分ごとに更新（SSRのhydration不一致を回避）
   const [nowMin, setNowMin] = useState<number | null>(null);
 
@@ -225,14 +224,15 @@ export default function DayTimeline({ reloadSignal = 0 }: { reloadSignal?: numbe
         {!loading && allDay.length > 0 && (
           <div className="mb-2 space-y-1">
             {allDay.map((ev) => (
-              <div
-                key={ev.id}
-                className="truncate rounded-md px-2 py-1 text-[11px] text-white"
+              <button
+                key={`${ev.accountEmail}-${ev.id}`}
+                onClick={() => setSelected(ev)}
+                className="block w-full truncate rounded-md px-2 py-1 text-left text-[11px] text-white"
                 style={{ background: badgeColor(ev.accountEmail) }}
                 title={ev.summary}
               >
                 終日 ・ {ev.summary}
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -283,9 +283,10 @@ export default function DayTimeline({ reloadSignal = 0 }: { reloadSignal?: numbe
                 const top = ((it.s - rangeStart) / 60) * HOUR_PX;
                 const height = Math.max(18, ((it.en - it.s) / 60) * HOUR_PX - 2);
                 return (
-                  <div
-                    key={it.id}
-                    className="absolute overflow-hidden rounded-md px-1.5 py-0.5 text-[11px] leading-tight text-white"
+                  <button
+                    key={`${it.accountEmail}-${it.id}`}
+                    onClick={() => setSelected(it)}
+                    className="absolute overflow-hidden rounded-md px-1.5 py-0.5 text-left text-[11px] leading-tight text-white transition hover:brightness-110"
                     style={{
                       top,
                       height,
@@ -302,13 +303,24 @@ export default function DayTimeline({ reloadSignal = 0 }: { reloadSignal?: numbe
                       {hhmm(it.start)}–{hhmm(it.end)}
                       {it.location ? ` ・${it.location}` : ""}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           </div>
         )}
       </div>
+
+      {selected && (
+        <EventModal
+          event={selected}
+          onClose={() => setSelected(null)}
+          onChanged={() => {
+            load(date);
+            onCalendarChanged?.();
+          }}
+        />
+      )}
     </div>
   );
 }

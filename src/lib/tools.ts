@@ -11,6 +11,7 @@ import {
 } from "./calendar";
 import { searchPlaces } from "./places";
 import { computeTravel, type TravelMode } from "./travel";
+import { searchEmails } from "./gmail";
 
 /** account パラメータ共通の説明 */
 const ACCOUNT_DESC =
@@ -107,6 +108,20 @@ export const calendarTools: Anthropic.Tool[] = [
     },
   },
   {
+    name: "search_emails",
+    description:
+      "Gmail を検索してメールを読む。『メールから予定を拾って』『〇〇からの予約メール確認して』など、メール内容を元に予定を起こしたいときに呼ぶ。query は Gmail の検索式（例 'newer_than:7d 予約', 'from:airline 搭乗', '面接 OR 会議'）。読み取ったメールから日時・場所が分かる予定候補を抽出し、ユーザーに要約提示して確認の上 create_event で追加する。account で対象アカウントを指定できる（省略時は既定）。",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Gmail 検索式（省略時は最近のメール）" },
+        maxResults: { type: "number", description: "取得件数（既定10・最大20）" },
+        account: { type: "string", description: ACCOUNT_DESC },
+      },
+      required: [],
+    },
+  },
+  {
     name: "travel_time",
     description:
       "2地点間の移動時間を調べる。『〇〇までどれくらい?』『家から間に合う?』などで呼ぶ。origin（出発地）と destination（目的地）に住所・駅・施設名を渡す。自宅からの場合はシステム記載の自宅住所を origin に入れる。mode は transit(電車・既定)/driving(車)/walking(徒歩)/bicycling(自転車)。車/徒歩/自転車は所要時間を返す。電車は数値が返らず Google マップの経路リンク(mapsUrl)を返すので、それをユーザーに案内する。",
@@ -166,6 +181,20 @@ export async function executeTool(
     throw new Error("連携中の Google アカウントがありません");
   }
   const account = input.account ? String(input.account) : undefined;
+
+  if (name === "search_emails") {
+    const acc = resolveAccount(ctx, account);
+    if (!acc.gmail) {
+      throw new Error(
+        "Gmail が未連携です。一度ログアウトして再ログインし、同意画面で Gmail の閲覧許可にチェックしてください。",
+      );
+    }
+    const emails = await searchEmails(acc.gmail, {
+      query: input.query ? String(input.query) : undefined,
+      maxResults: typeof input.maxResults === "number" ? input.maxResults : undefined,
+    });
+    return { account: acc.email, emails };
+  }
 
   switch (name) {
     case "list_events": {

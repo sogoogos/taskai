@@ -3,7 +3,7 @@ import { calendarTools, executeTool } from "@/lib/tools";
 import { makeFakeCalendar } from "./helpers/fakeCalendar";
 
 describe("calendarTools 定義", () => {
-  it("6つのツール（カレンダー4 + 場所検索 + 移動時間）が定義されている", () => {
+  it("7つのツール（カレンダー4 + 場所 + 移動時間 + メール）が定義されている", () => {
     const names = calendarTools.map((t) => t.name).sort();
     expect(names).toEqual(
       [
@@ -11,6 +11,7 @@ describe("calendarTools 定義", () => {
         "delete_event",
         "find_places",
         "list_events",
+        "search_emails",
         "travel_time",
         "update_event",
       ].sort(),
@@ -84,6 +85,38 @@ describe("executeTool ディスパッチ", () => {
     await expect(executeTool(ctx, "unknown_tool", {})).rejects.toThrow(
       /未知のツール/,
     );
+  });
+
+  it("search_emails: Gmail未連携ならエラー", async () => {
+    const { ctx } = makeFakeCalendar(); // gmail なし
+    await expect(executeTool(ctx, "search_emails", { query: "x" })).rejects.toThrow(
+      /Gmail が未連携/,
+    );
+  });
+
+  it("search_emails: gmail クライアントで検索する", async () => {
+    const list = vi.fn(async () => ({ data: { messages: [{ id: "m1" }] } }));
+    const get = vi.fn(async () => ({
+      data: {
+        snippet: "テスト",
+        payload: {
+          headers: [{ name: "Subject", value: "予約" }],
+          mimeType: "text/plain",
+          body: { data: Buffer.from("6/20 19:00", "utf8").toString("base64") },
+        },
+      },
+    }));
+    const fakeGmail = { users: { messages: { list, get } } };
+    const base = makeFakeCalendar({ email: "me@example.com" });
+    const ctx = { accounts: [{ ...base.ctx.accounts[0], gmail: fakeGmail }] } as never;
+
+    const result = (await executeTool(ctx, "search_emails", { query: "予約" })) as {
+      account: string;
+      emails: { subject: string }[];
+    };
+    expect(list).toHaveBeenCalledOnce();
+    expect(result.account).toBe("me@example.com");
+    expect(result.emails[0].subject).toBe("予約");
   });
 });
 

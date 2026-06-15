@@ -10,6 +10,7 @@ export const GOOGLE_SCOPES = [
   "openid",
   "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/calendar",
+  "https://www.googleapis.com/auth/gmail.readonly",
 ];
 
 export function createOAuthClient(): OAuth2Client {
@@ -106,6 +107,7 @@ export async function calendarAccountsForIds(ids: number[]): Promise<CalendarAcc
     accounts.push({
       email: user.email,
       calendar: google.calendar({ version: "v3", auth }),
+      gmail: google.gmail({ version: "v1", auth }),
     });
   }
   return accounts;

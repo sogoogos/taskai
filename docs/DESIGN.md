@@ -137,6 +137,10 @@ runAgent({ client, calendar, system, history, onText, onTool })
 
 カレンダー以外の「近くのカフェは？」等に応えるため、Google Places API (New) Text Search を `searchPlaces()`（`fetch` 注入可でテスト容易）でラップし `find_places` として全プロバイダ共通の toolset に追加。`executeTool` 冒頭で分岐し、カレンダー連携が無くても動く。`GOOGLE_MAPS_API_KEY` 必須。Wi-Fi/電源/混雑は取得不可のため system プロンプトで一般助言に委ねる。
 
+### Gmail 取り込みツール（`lib/gmail.ts` / search_emails）
+
+フェーズ2「メールから予定を起こす」を、専用UIではなく**エージェントのツール**として実装。`searchEmails(gmail, {query, maxResults})`（gmail クライアント注入可）が Gmail を検索し、件名/差出人/日時/本文（text/plain 優先・HTMLはタグ除去・最大1500字）を返す。`search_emails` ツールとして追加し、モデルがメールを読んで予定候補を抽出 → ユーザー確認 → `create_event` で追加する流れ。`CalendarAccount.gmail` に gmail クライアントを持たせ、`account` 指定可（既定=主）。**`gmail.readonly` スコープが必要**で、既存ユーザーは再ログインで許可（未連携時はツールがエラーで再ログインを促す）。Gmail は制限付きスコープだが Testing モードのテストユーザーなら審査不要。
+
 ### 移動時間ツール（`lib/travel.ts`）
 
 「家から間に合う?」等に応える。`computeTravel()`（`fetch` 注入可）を `travel_time` として追加（`find_places` 同様カレンダー非依存）。

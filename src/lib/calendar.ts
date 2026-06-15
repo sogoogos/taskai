@@ -1,11 +1,12 @@
-import type { calendar_v3 } from "googleapis";
+import type { calendar_v3, gmail_v1 } from "googleapis";
 
 export const DEFAULT_TIMEZONE = "Asia/Tokyo";
 
-/** 1つの Google アカウントとその Calendar クライアント。accounts[0] を既定とする。 */
+/** 1つの Google アカウントと各種クライアント。accounts[0] を既定とする。 */
 export interface CalendarAccount {
   email: string;
   calendar: calendar_v3.Calendar;
+  gmail?: gmail_v1.Gmail; // Gmail 連携時のみ
 }
 
 /** 複数アカウント横断のコンテキスト（accounts[0] = 既定アカウント） */

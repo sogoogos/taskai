@@ -52,6 +52,17 @@
 
 ## 4. Google OAuth に本番リダイレクトを追加
 
+> ⚠️ **重要: `*.vercel.app` では Google ログインが通りません。**
+> Google OAuth はカレンダー等の機微スコープを共有ドメイン（`vercel.app` のような公開サフィックス）で許可せず、`Error 400: invalid_request`（"doesn't comply with Google's OAuth 2.0 policy"）になります。
+> **自分が所有する独自ドメインが必須**です（年数百円〜）。下記は独自ドメイン前提です。
+>
+> 手順:
+> 1. ドメインを取得（Porkbun / Cloudflare 等）
+> 2. Vercel → プロジェクト → **Domains** に追加し、DNS を設定（Valid Configuration になるまで）
+> 3. このあとのリダイレクトURI・`GOOGLE_REDIRECT_URI` は、その独自ドメインを使う
+> 4. OAuth クライアントから `*.vercel.app` のリダイレクトURIは**削除**する（無効な承認済みドメインとして残ると弾かれ続ける）
+
+
 1. [Google Cloud → 認証情報](https://console.cloud.google.com/apis/credentials) → OAuthクライアント（ウェブ）
 2. **承認済みのリダイレクト URI** に追加:
    ```

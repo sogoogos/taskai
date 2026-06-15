@@ -109,7 +109,7 @@ export const calendarTools: Anthropic.Tool[] = [
   {
     name: "travel_time",
     description:
-      "2地点間の移動時間を計算する。『〇〇までどれくらい?』『家から間に合う?』など移動の所要時間を尋ねられたら呼ぶ。origin（出発地）と destination（目的地）に住所・駅・施設名を渡す。ユーザーの自宅から、の場合はシステムに記載の自宅住所を origin に入れる。mode は transit(電車・既定)/driving(車)/walking(徒歩)/bicycling(自転車)。",
+      "2地点間の移動時間を調べる。『〇〇までどれくらい?』『家から間に合う?』などで呼ぶ。origin（出発地）と destination（目的地）に住所・駅・施設名を渡す。自宅からの場合はシステム記載の自宅住所を origin に入れる。mode は transit(電車・既定)/driving(車)/walking(徒歩)/bicycling(自転車)。車/徒歩/自転車は所要時間を返す。電車は数値が返らず Google マップの経路リンク(mapsUrl)を返すので、それをユーザーに案内する。",
     input_schema: {
       type: "object",
       properties: {

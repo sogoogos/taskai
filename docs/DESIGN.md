@@ -139,7 +139,10 @@ runAgent({ client, calendar, system, history, onText, onTool })
 
 ### 移動時間ツール（`lib/travel.ts`）
 
-「家から間に合う?」等に応えるため、Google Routes API computeRoutes を `computeTravel()`（`fetch` 注入可）でラップし `travel_time` として追加。`origin`/`destination`/`mode`(transit/driving/walking/bicycling)を受け、所要時間を整形（約N分/約N時間）。`find_places` 同様カレンダー非依存。`GOOGLE_MAPS_API_KEY`＋Routes API 有効化が必要。
+「家から間に合う?」等に応える。`computeTravel()`（`fetch` 注入可）を `travel_time` として追加（`find_places` 同様カレンダー非依存）。
+- 車/徒歩/自転車: Google Routes API computeRoutes で所要時間を計算（約N分/約N時間）。
+- 電車(transit): **Google Maps Platform の API は日本の公共交通に非対応**（DRIVE/WALK は返るが TRANSIT は ZERO_RESULTS）。そのため API を呼ばず、**Google マップの経路リンク**（`mapsDirectionsUrl`、公式 Maps URLs・キー不要）を返し、ユーザーが実際の電車所要時間を確認できるようにする。
+- いずれのモードでも確認用 `mapsUrl` を付与。`GOOGLE_MAPS_API_KEY`＋Routes API 有効化が必要（電車リンクのみキー不要）。
 
 ### プロフィール（`profiles` テーブル / 設定UI）
 

@@ -1,8 +1,14 @@
-/** Google Routes API (computeRoutes) で2地点間の移動時間を計算する薄いラッパ。 */
+/**
+ * 移動時間ツール。
+ * - 車/徒歩/自転車: Google Routes API で正確な所要時間を計算。
+ * - 電車(transit): Google の API は日本の公共交通に非対応のため、所要時間は計算せず
+ *   「Google マップで開く経路リンク」を返す（無料・公式に許可された方法）。
+ * いずれのモードでも確認用に Google マップのリンクを付与する。
+ */
 
 export type TravelMode = "transit" | "driving" | "walking" | "bicycling";
 
-const MODE_MAP: Record<TravelMode, string> = {
+const ROUTES_MODE: Record<TravelMode, string> = {
   transit: "TRANSIT",
   driving: "DRIVE",
   walking: "WALK",
@@ -15,9 +21,11 @@ export interface TravelResult {
   mode: TravelMode;
   origin: string;
   destination: string;
-  durationSeconds: number;
-  durationText: string;
+  durationSeconds?: number; // transit では未設定（APIで取得不可）
+  durationText?: string;
   distanceMeters?: number;
+  mapsUrl: string; // Google マップの経路リンク（タップで実際の所要時間を確認）
+  note?: string;
 }
 
 function formatDuration(sec: number): string {
@@ -28,6 +36,21 @@ function formatDuration(sec: number): string {
   return rem === 0 ? `約${h}時間` : `約${h}時間${rem}分`;
 }
 
+/** Google マップの経路リンク（公式の Maps URLs。キー不要・無料）。日本の電車経路もここで見られる。 */
+export function mapsDirectionsUrl(
+  origin: string,
+  destination: string,
+  mode: TravelMode,
+): string {
+  const params = new URLSearchParams({
+    api: "1",
+    origin,
+    destination,
+    travelmode: mode, // transit/driving/walking/bicycling はそのまま使える
+  });
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
 export async function computeTravel(params: {
   origin: string;
   destination: string;
@@ -35,24 +58,33 @@ export async function computeTravel(params: {
   apiKey?: string;
   fetchImpl?: typeof fetch;
 }): Promise<TravelResult> {
+  const mode: TravelMode = params.mode ?? "transit";
+  const mapsUrl = mapsDirectionsUrl(params.origin, params.destination, mode);
+
+  // 電車は API で日本の経路が取れないため、リンク提示に切り替える（APIは呼ばない）
+  if (mode === "transit") {
+    return {
+      mode,
+      origin: params.origin,
+      destination: params.destination,
+      mapsUrl,
+      note:
+        "電車の所要時間は API では取得できないため、Google マップのリンク（mapsUrl）で確認してください。正確な時間が必要なら、このリンクをユーザーに提示する。車/徒歩での概算が必要なら mode を変えて再計算できる。",
+    };
+  }
+
   const apiKey = params.apiKey ?? process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     throw new Error("GOOGLE_MAPS_API_KEY が未設定です（.env.local を確認）");
   }
-  const mode: TravelMode = params.mode ?? "transit";
   const doFetch = params.fetchImpl ?? fetch;
 
   const body: Record<string, unknown> = {
     origin: { address: params.origin },
     destination: { address: params.destination },
-    travelMode: MODE_MAP[mode],
+    travelMode: ROUTES_MODE[mode],
   };
-  // 車のみ交通状況を考慮（TRANSIT/WALK/BICYCLE では指定不可）
   if (mode === "driving") body.routingPreference = "TRAFFIC_AWARE";
-  // 公共交通は出発時刻が必要（既定は直後）
-  if (mode === "transit") {
-    body.departureTime = new Date(Date.now() + 60 * 1000).toISOString();
-  }
 
   const res = await doFetch(ENDPOINT, {
     method: "POST",
@@ -75,14 +107,8 @@ export async function computeTravel(params: {
   };
   const route = data.routes?.[0];
   if (!route?.duration) {
-    if (mode === "transit") {
-      throw new Error(
-        "電車の経路を取得できませんでした（Google の API は日本の公共交通に対応していない場合があります）。車・徒歩・自転車なら計算できます。電車の正確な所要時間は乗換アプリの確認を勧めてください。",
-      );
-    }
     throw new Error("経路が見つかりませんでした");
   }
-  // duration は "1234s" 形式
   const durationSeconds = parseInt(route.duration.replace("s", ""), 10) || 0;
 
   return {
@@ -92,5 +118,6 @@ export async function computeTravel(params: {
     durationSeconds,
     durationText: formatDuration(durationSeconds),
     distanceMeters: route.distanceMeters,
+    mapsUrl,
   };
 }

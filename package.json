@@ -1,0 +1,37 @@
+{
+  "name": "taskai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.0",
+    "@google/genai": "^2.8.0",
+    "better-sqlite3": "^12.10.0",
+    "googleapis": "^173.0.0",
+    "iron-session": "^8.0.4",
+    "next": "^16.2.0",
+    "openai": "^6.42.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "overrides": {
+    "google-auth-library": "^10.7.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.0"
+  }
+}

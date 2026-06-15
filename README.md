@@ -59,6 +59,11 @@ npm run dev
 
 `http://localhost:3000` を開き「Google でログイン」→ チャットで予定を操作。
 
+## 秘密情報の取り扱い
+
+- 実キーは必ず `.env.local`（gitignore 済み）にのみ置く。`.env.example` は見本専用でプレースホルダのみ。
+- `npm install` 時に秘密検知の pre-commit フック（`.githooks/pre-commit`）が有効化され、実キーらしき値のコミットをブロックします（回避は `git commit --no-verify`）。
+
 ## テスト
 
 ```bash

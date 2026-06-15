@@ -1,0 +1,45 @@
+#!/bin/sh
+# 秘密情報の混入を防ぐ pre-commit フック（外部ツール不要）。
+# ステージされた追加/変更ファイルの内容に実キーらしきパターンがあればコミットを中止する。
+# どうしても通したい場合は `git commit --no-verify` で回避可能。
+
+# 検出パターン（プレースホルダ 'AIza...' 'sk-...' 'GOCSPX-xxxx' 等は桁数条件で誤検知しない）
+patterns='
+AIza[0-9A-Za-z_-]{35}
+AQ\.[A-Za-z0-9_-]{30,}
+sk-ant-[0-9A-Za-z_-]{24,}
+sk-(proj-)?[A-Za-z0-9_-]{32,}
+GOCSPX-[0-9A-Za-z_-]{20,}
+'
+
+found=0
+files=$(git diff --cached --name-only --diff-filter=ACM)
+
+for f in $files; do
+  # バイナリ等は git grep に任せず、ステージ済み内容を取り出して検査
+  content=$(git show ":$f" 2>/dev/null) || continue
+  for p in $patterns; do
+    [ -z "$p" ] && continue
+    hits=$(printf '%s\n' "$content" | grep -nE "$p" 2>/dev/null)
+    if [ -n "$hits" ]; then
+      if [ "$found" -eq 0 ]; then
+        echo "✖ コミットを中止: 秘密情報らしき値を検出しました。" >&2
+        echo "" >&2
+      fi
+      found=1
+      # 値はマスクして表示
+      masked=$(printf '%s\n' "$hits" | sed -E 's/(AIza|AQ\.|sk-ant-|sk-|GOCSPX-)[A-Za-z0-9._-]+/\1<REDACTED>/g')
+      echo "  [$f]" >&2
+      printf '%s\n' "$masked" | sed 's/^/    /' >&2
+    fi
+  done
+done
+
+if [ "$found" -ne 0 ]; then
+  echo "" >&2
+  echo "→ 実キーは .env.local（gitignore済み）にのみ置いてください。" >&2
+  echo "→ 誤検知で通したい場合のみ: git commit --no-verify" >&2
+  exit 1
+fi
+
+exit 0

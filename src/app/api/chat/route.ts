@@ -7,6 +7,7 @@ import {
   runWithProvider,
   defaultProviderId,
   isProviderId,
+  humanizeProviderError,
   type NeutralMessage,
 } from "@/lib/llm";
 
@@ -72,8 +73,8 @@ export async function POST(req: NextRequest) {
         });
         send("done", { provider: providerId });
       } catch (err) {
-        const message = err instanceof Error ? err.message : "エラーが発生しました";
-        send("error", { message });
+        console.error("[chat] error:", err instanceof Error ? err.message : err);
+        send("error", { message: humanizeProviderError(err) });
       } finally {
         controller.close();
       }

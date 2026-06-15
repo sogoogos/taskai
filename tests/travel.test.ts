@@ -64,7 +64,20 @@ describe("computeTravel", () => {
         Promise.resolve(okResponse({ routes: [] })),
     );
     await expect(
-      computeTravel({ origin: "A", destination: "B", apiKey: "K", fetchImpl: fetchImpl as unknown as typeof fetch }),
+      computeTravel({ origin: "A", destination: "B", mode: "driving", apiKey: "K", fetchImpl: fetchImpl as unknown as typeof fetch }),
     ).rejects.toThrow(/経路が見つかりません/);
+  });
+
+  it("transit は departureTime を付け、空なら日本の公共交通制約を案内する", async () => {
+    const fetchImpl = vi.fn(
+      (_url: string, _init?: RequestInit): Promise<Response> =>
+        Promise.resolve(okResponse({ routes: [] })),
+    );
+    await expect(
+      computeTravel({ origin: "東京駅", destination: "渋谷駅", mode: "transit", apiKey: "K", fetchImpl: fetchImpl as unknown as typeof fetch }),
+    ).rejects.toThrow(/公共交通/);
+    const body = JSON.parse((fetchImpl.mock.calls[0][1]!).body as string);
+    expect(body.travelMode).toBe("TRANSIT");
+    expect(body.departureTime).toBeTruthy();
   });
 });

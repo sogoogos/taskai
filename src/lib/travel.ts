@@ -49,6 +49,10 @@ export async function computeTravel(params: {
   };
   // 車のみ交通状況を考慮（TRANSIT/WALK/BICYCLE では指定不可）
   if (mode === "driving") body.routingPreference = "TRAFFIC_AWARE";
+  // 公共交通は出発時刻が必要（既定は直後）
+  if (mode === "transit") {
+    body.departureTime = new Date(Date.now() + 60 * 1000).toISOString();
+  }
 
   const res = await doFetch(ENDPOINT, {
     method: "POST",
@@ -71,6 +75,11 @@ export async function computeTravel(params: {
   };
   const route = data.routes?.[0];
   if (!route?.duration) {
+    if (mode === "transit") {
+      throw new Error(
+        "電車の経路を取得できませんでした（Google の API は日本の公共交通に対応していない場合があります）。車・徒歩・自転車なら計算できます。電車の正確な所要時間は乗換アプリの確認を勧めてください。",
+      );
+    }
     throw new Error("経路が見つかりませんでした");
   }
   // duration は "1234s" 形式

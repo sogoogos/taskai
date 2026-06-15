@@ -33,6 +33,10 @@ describe("buildSystemPrompt", () => {
     expect(sys).toMatch(/確認/);
   });
 
+  it("宣言で終わらず実行しきる指示を含む", () => {
+    expect(sys).toMatch(/やり切る|宣言だけ/);
+  });
+
   it("プロフィール（自宅住所・状況メモ）を渡すと反映される", () => {
     const withProfile = buildSystemPrompt({
       now: new Date("2026-06-15T12:00:00+09:00"),

@@ -4,7 +4,7 @@ import { DEFAULT_TIMEZONE, type CalendarContext } from "./calendar";
 
 export const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5";
 const MAX_TOKENS = 4096;
-const MAX_TURNS = 10; // 無限ループ防止
+const MAX_TURNS = 25; // 無限ループ防止（複数予定の一括作成に対応するため広め）
 
 /** 動的な現在時刻・ユーザー情報を含む system プロンプトを生成 */
 export function buildSystemPrompt(opts: {
@@ -38,6 +38,8 @@ export function buildSystemPrompt(opts: {
     opts.note ? `ユーザーの状況メモ: ${opts.note}` : "",
     "",
     "## 行動指針",
+    "- 重要: ツールで実行できる依頼は、宣言だけして終わらず、同じ応答内で実際にツールを呼んで最後までやり切る。『まず確認します』『〜します』とだけ書いてターンを終えない。必要なら list_events→（空き時間の算出）→create_event を連続して実行する。",
+    "- 『空いている時間に入れて』系の依頼: 対象期間を list_events で確認し、既存予定と重ならない空き枠を、常識的な時間帯（目安 9:00-22:00）・ユーザーの状況メモ・体力配慮を踏まえて選び、各日に create_event で作成する。毎日なら recurrence を使ってもよいが、空き状況が日替わりなら日ごとに作る。最後に『何を・どの日の何時に入れたか』を一覧で報告する。",
     "- 日時はこのタイムゾーンの ISO8601（例 2026-06-15T15:00:00+09:00）で扱う。『明日』『来週』等は現在日時から解決する。",
     "- 日時や長さが曖昧なときは作成せず、まず簡潔に確認する。",
     "- 『毎日』『毎週』など繰り返しは recurrence に RRULE を入れる（毎日=RRULE:FREQ=DAILY、平日=RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR）。",

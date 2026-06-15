@@ -3,7 +3,7 @@ import type { CalendarContext } from "../calendar";
 import type { NeutralMessage, RunResult } from "./types";
 
 export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
-const MAX_TURNS = 10;
+const MAX_TURNS = 25;
 
 interface GeminiFunctionCall {
   name?: string;

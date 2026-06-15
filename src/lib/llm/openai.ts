@@ -3,7 +3,7 @@ import type { CalendarContext } from "../calendar";
 import type { NeutralMessage, RunResult } from "./types";
 
 export const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
-const MAX_TURNS = 10;
+const MAX_TURNS = 25;
 
 /** OpenAI Chat Completions の最小インターフェース（テストでモックしやすい） */
 export interface OpenAIChatClient {

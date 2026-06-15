@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { badgeColor } from "./colors";
 
 interface EventItem {
   id: string;
@@ -17,14 +18,6 @@ interface AccountItem {
   id: number;
   email: string;
   isPrimary: boolean;
-}
-
-// アカウントごとに色を割り当て（メールのハッシュで安定化）
-const BADGE_COLORS = ["#6d8bff", "#34d399", "#f59e0b", "#f472b6", "#22d3ee"];
-function badgeColor(email: string): string {
-  let h = 0;
-  for (let i = 0; i < email.length; i++) h = (h * 31 + email.charCodeAt(i)) >>> 0;
-  return BADGE_COLORS[h % BADGE_COLORS.length];
 }
 
 function formatWhen(ev: EventItem): string {
@@ -88,9 +81,9 @@ export default function Agenda({ reloadSignal = 0 }: { reloadSignal?: number }) 
   const multi = accounts.length > 1;
 
   return (
-    <aside className="flex min-h-0 flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-      <div className="flex items-center justify-between border-b border-[var(--border)] p-3">
-        <h2 className="text-sm font-semibold">直近の予定</h2>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2">
+        <span className="text-xs text-[var(--muted)]">直近2週間</span>
         <button
           onClick={load}
           className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)] transition hover:bg-[var(--surface-2)]"
@@ -170,6 +163,6 @@ export default function Agenda({ reloadSignal = 0 }: { reloadSignal?: number }) 
           </div>
         ))}
       </div>
-    </aside>
+    </div>
   );
 }

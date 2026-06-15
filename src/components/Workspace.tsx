@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import Chat from "./Chat";
-import Agenda from "./Agenda";
+import RightPanel from "./RightPanel";
 
 type Provider = "claude" | "openai" | "gemini";
 
@@ -20,7 +20,7 @@ export default function Workspace({
   return (
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[1fr_320px]">
       <Chat defaultProvider={defaultProvider} onCalendarChanged={onCalendarChanged} />
-      <Agenda reloadSignal={reloadSignal} />
+      <RightPanel reloadSignal={reloadSignal} />
     </div>
   );
 }

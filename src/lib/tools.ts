@@ -10,6 +10,7 @@ import {
   type CalendarAccount,
 } from "./calendar";
 import { searchPlaces } from "./places";
+import { computeTravel, type TravelMode } from "./travel";
 
 /** account パラメータ共通の説明 */
 const ACCOUNT_DESC =
@@ -105,6 +106,24 @@ export const calendarTools: Anthropic.Tool[] = [
       required: ["query"],
     },
   },
+  {
+    name: "travel_time",
+    description:
+      "2地点間の移動時間を計算する。『〇〇までどれくらい?』『家から間に合う?』など移動の所要時間を尋ねられたら呼ぶ。origin（出発地）と destination（目的地）に住所・駅・施設名を渡す。ユーザーの自宅から、の場合はシステムに記載の自宅住所を origin に入れる。mode は transit(電車・既定)/driving(車)/walking(徒歩)/bicycling(自転車)。",
+    input_schema: {
+      type: "object",
+      properties: {
+        origin: { type: "string", description: "出発地（住所・駅・施設名）" },
+        destination: { type: "string", description: "目的地（住所・駅・施設名）" },
+        mode: {
+          type: "string",
+          enum: ["transit", "driving", "walking", "bicycling"],
+          description: "移動手段（既定 transit）",
+        },
+      },
+      required: ["origin", "destination"],
+    },
+  },
 ];
 
 /** account メールから対象アカウントを解決（無ければ既定 = accounts[0]） */
@@ -127,12 +146,19 @@ export async function executeTool(
   // どのツールがどの引数で呼ばれたかをサーバログに出す（診断用）
   console.log(`[tool] ${name} ${JSON.stringify(input)}`);
 
-  // 場所検索はカレンダー連携に依存しない
+  // 場所検索・移動時間はカレンダー連携に依存しない
   if (name === "find_places") {
     return searchPlaces({
       query: String(input.query),
       near: input.near ? String(input.near) : undefined,
       openNow: typeof input.openNow === "boolean" ? input.openNow : undefined,
+    });
+  }
+  if (name === "travel_time") {
+    return computeTravel({
+      origin: String(input.origin),
+      destination: String(input.destination),
+      mode: input.mode ? (String(input.mode) as TravelMode) : undefined,
     });
   }
 

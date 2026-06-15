@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server";
 import { getSession, accountIdsOf } from "@/lib/session";
 import { calendarAccountsForIds } from "@/lib/google";
+import { getProfile } from "@/lib/db";
 import { buildSystemPrompt } from "@/lib/claude";
 import {
   runWithProvider,
@@ -41,10 +42,13 @@ export async function POST(req: NextRequest) {
   }));
 
   const accounts = calendarAccountsForIds(accountIdsOf(session));
+  const profile = getProfile(session.userId);
   const system = buildSystemPrompt({
     now: new Date(),
     email: session.email,
     accounts: accounts.map((a) => a.email),
+    homeAddress: profile.homeAddress,
+    note: profile.note,
   });
 
   const encoder = new TextEncoder();

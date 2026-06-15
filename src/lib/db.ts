@@ -42,6 +42,13 @@ function init(): Database.Database {
       content         TEXT NOT NULL,
       created_at      INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS profiles (
+      user_id      INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      home_address TEXT,
+      note         TEXT,
+      updated_at   INTEGER NOT NULL
+    );
   `);
   return db;
 }
@@ -117,6 +124,36 @@ export function getUserById(id: number): UserRow | undefined {
   return db.prepare("SELECT * FROM users WHERE id = ?").get(id) as
     | UserRow
     | undefined;
+}
+
+export interface Profile {
+  homeAddress: string | null;
+  note: string | null;
+}
+
+/** ユーザーのプロフィールを取得（無ければ空） */
+export function getProfile(userId: number): Profile {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT home_address, note FROM profiles WHERE user_id = ?")
+    .get(userId) as { home_address: string | null; note: string | null } | undefined;
+  return {
+    homeAddress: row?.home_address ?? null,
+    note: row?.note ?? null,
+  };
+}
+
+/** ユーザーのプロフィールを保存（upsert） */
+export function setProfile(userId: number, profile: Profile): void {
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO profiles (user_id, home_address, note, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET
+       home_address = excluded.home_address,
+       note = excluded.note,
+       updated_at = excluded.updated_at`,
+  ).run(userId, profile.homeAddress, profile.note, Date.now());
 }
 
 /** トークンが更新されたとき DB に書き戻す */

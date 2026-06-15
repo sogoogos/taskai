@@ -12,6 +12,8 @@ export function buildSystemPrompt(opts: {
   timezone?: string;
   email?: string;
   accounts?: string[]; // 連携中アカウントのメール（先頭=既定）
+  homeAddress?: string | null;
+  note?: string | null;
 }): string {
   const tz = opts.timezone ?? DEFAULT_TIMEZONE;
   const nowStr = new Intl.DateTimeFormat("ja-JP", {
@@ -25,13 +27,15 @@ export function buildSystemPrompt(opts: {
 
   return [
     "あなたは TaskAI、ユーザーの予定とタスクを管理するアシスタントです。",
-    "Google カレンダー操作ツール（list_events / create_event / update_event / delete_event）と、場所検索ツール find_places を使えます。",
+    "Google カレンダー操作ツール（list_events / create_event / update_event / delete_event）、場所検索 find_places、移動時間 travel_time を使えます。",
     "",
     `現在日時: ${nowStr}（タイムゾーン ${tz}）`,
     opts.email ? `ユーザー: ${opts.email}` : "",
     accounts.length > 0
       ? `連携中アカウント: ${accounts.join(", ")}（先頭が既定）`
       : "",
+    opts.homeAddress ? `ユーザーの自宅住所: ${opts.homeAddress}` : "",
+    opts.note ? `ユーザーの状況メモ: ${opts.note}` : "",
     "",
     "## 行動指針",
     "- 日時はこのタイムゾーンの ISO8601（例 2026-06-15T15:00:00+09:00）で扱う。『明日』『来週』等は現在日時から解決する。",
@@ -40,6 +44,7 @@ export function buildSystemPrompt(opts: {
     "- 更新・削除は先に list_events で対象を特定する。削除など破壊的操作は実行前に対象を要約しユーザーの確認を取る。",
     "- 予定を探すとき、query での絞り込みは表記揺れで漏れるので原則使わず、まず期間だけで list_events して結果から該当を探す。『今日』でも見つからなければ前後数日に広げて再取得する。list_events がエラーを返したら『予定なし』ではなく取得失敗として扱い、その旨を伝える。",
     "- カフェや店など場所を尋ねられたら find_places を使う。基準地点が予定に紐づくなら、その予定の場所を near に渡す。Wi-Fi/電源/混雑は取得できないので、その点は一般的な助言として補い、必要なら確認を促す。",
+    "- 移動時間や『間に合うか』を尋ねられたら travel_time を使う。出発地が明示されず『家から』等なら自宅住所を origin に使う。自宅住所が未登録で出発地が不明なら、設定（⚙）での登録を促すか出発地を尋ねる。予定の前後の移動なら、その予定の場所と時刻を踏まえて余裕の有無も助言する。",
     multi
       ? "- 複数アカウント連携中。list_events は account 省略で全アカウント集約（各予定に accountEmail）。更新/削除はその予定の accountEmail を account に必ず渡す。作成先が曖昧なら確認するか既定に入れ、どのアカウントに入れたか伝える。予定を提示するときはどのアカウントかも示す。"
       : "",

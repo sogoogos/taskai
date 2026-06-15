@@ -32,4 +32,16 @@ describe("buildSystemPrompt", () => {
     expect(sys).toMatch(/削除/);
     expect(sys).toMatch(/確認/);
   });
+
+  it("プロフィール（自宅住所・状況メモ）を渡すと反映される", () => {
+    const withProfile = buildSystemPrompt({
+      now: new Date("2026-06-15T12:00:00+09:00"),
+      email: "user@example.com",
+      homeAddress: "東京都中央区銀座6-6-1",
+      note: "移動は基本電車",
+    });
+    expect(withProfile).toContain("自宅住所: 東京都中央区銀座6-6-1");
+    expect(withProfile).toContain("移動は基本電車");
+    expect(withProfile).toContain("travel_time");
+  });
 });

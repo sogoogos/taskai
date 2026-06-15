@@ -137,6 +137,14 @@ runAgent({ client, calendar, system, history, onText, onTool })
 
 カレンダー以外の「近くのカフェは？」等に応えるため、Google Places API (New) Text Search を `searchPlaces()`（`fetch` 注入可でテスト容易）でラップし `find_places` として全プロバイダ共通の toolset に追加。`executeTool` 冒頭で分岐し、カレンダー連携が無くても動く。`GOOGLE_MAPS_API_KEY` 必須。Wi-Fi/電源/混雑は取得不可のため system プロンプトで一般助言に委ねる。
 
+### 移動時間ツール（`lib/travel.ts`）
+
+「家から間に合う?」等に応えるため、Google Routes API computeRoutes を `computeTravel()`（`fetch` 注入可）でラップし `travel_time` として追加。`origin`/`destination`/`mode`(transit/driving/walking/bicycling)を受け、所要時間を整形（約N分/約N時間）。`find_places` 同様カレンダー非依存。`GOOGLE_MAPS_API_KEY`＋Routes API 有効化が必要。
+
+### プロフィール（`profiles` テーブル / 設定UI）
+
+「ユーザーの状況を設定」する機能。`profiles(user_id, home_address, note)` を主アカウント userId 単位で保存。`/api/profile`(GET/PUT)、ヘッダ⚙の `SettingsButton` モーダルで編集。`buildSystemPrompt` が自宅住所・状況メモを system プロンプトに注入し、`travel_time` の出発地補完や負荷判断（体力配慮）に活用。住所など個人情報は SQLite ローカル保存のみ。
+
 ### 繰り返し（RRULE）
 
 「毎日」「毎週」「平日」などの自然言語を system プロンプトの指示で RRULE に変換。

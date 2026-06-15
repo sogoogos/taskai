@@ -133,10 +133,9 @@ export async function aggregateEvents(
         const events = await listEvents(a.calendar, params);
         for (const e of events) collected.push({ ...e, accountEmail: a.email });
       } catch (err) {
-        errors.push({
-          email: a.email,
-          message: err instanceof Error ? err.message : String(err),
-        });
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[calendar] ${a.email} 取得失敗: ${message}`);
+        errors.push({ email: a.email, message });
       }
     }),
   );

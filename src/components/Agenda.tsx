@@ -122,12 +122,17 @@ export default function Agenda({ reloadSignal = 0 }: { reloadSignal?: number }) 
             className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-300"
           >
             <div className="font-medium">{w.email} は読み込めませんでした</div>
+            {w.message && (
+              <div className="mt-0.5 break-words font-mono text-[10px] opacity-90">
+                {w.message}
+              </div>
+            )}
             <div className="mt-0.5 opacity-80">
-              カレンダー権限が不足している可能性があります。
+              多くは権限不足かトークン失効です。
               <a href="/api/auth/google?add=1" className="underline">
                 再連携
               </a>
-              （同意画面でカレンダーにチェック）してください。
+              （アカウントを選び、同意画面でカレンダーにチェック）してください。
             </div>
           </div>
         ))}

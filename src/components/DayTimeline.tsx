@@ -12,6 +12,12 @@ interface TimedItem extends CalendarEventItem {
   cols: number;
 }
 
+interface AccountItem {
+  id: number;
+  email: string;
+  isPrimary: boolean;
+}
+
 const HOUR_PX = 44;
 
 function todayStr(): string {
@@ -107,6 +113,7 @@ export default function DayTimeline({
 }) {
   const [date, setDate] = useState<string>(todayStr());
   const [events, setEvents] = useState<CalendarEventItem[]>([]);
+  const [accounts, setAccounts] = useState<AccountItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<CalendarEventItem | null>(null);
@@ -142,6 +149,14 @@ export default function DayTimeline({
   useEffect(() => {
     load(date);
   }, [load, date, reloadSignal]);
+
+  // 連携アカウント一覧（凡例用）。日付に依らないので別ロード
+  useEffect(() => {
+    fetch("/api/accounts")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setAccounts(d.accounts ?? []))
+      .catch(() => {});
+  }, [reloadSignal]);
 
   const allDay = useMemo(() => events.filter((e) => e.allDay), [events]);
 
@@ -215,6 +230,26 @@ export default function DayTimeline({
           今日
         </button>
       </div>
+
+      {/* アカウント色の凡例（複数連携時のみ） */}
+      {accounts.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border)] px-3 py-2">
+          {accounts.map((a) => (
+            <span
+              key={a.id}
+              className="flex items-center gap-1 rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px]"
+              title={a.email}
+            >
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ background: badgeColor(a.email) }}
+              />
+              {a.email.split("@")[0]}
+              {a.isPrimary ? "（主）" : ""}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-3">
         {loading && <p className="text-xs text-[var(--muted)]">読み込み中…</p>}

@@ -139,6 +139,38 @@ describe("executeTool 複数アカウント", () => {
     expect(result[1].accountEmail).toBe("a@example.com");
   });
 
+  it("全アカウントが取得失敗かつ0件ならエラーを投げる（空と区別）", async () => {
+    const a = makeFakeCalendar({ email: "a@example.com" });
+    (a.list as unknown as { mockRejectedValueOnce: (e: Error) => void }).mockRejectedValueOnce(
+      new Error("insufficient authentication scopes"),
+    );
+    const ctx = { accounts: [a.ctx.accounts[0]] };
+    await expect(
+      executeTool(ctx, "list_events", {
+        timeMin: "2026-06-15T00:00:00+09:00",
+        timeMax: "2026-06-16T00:00:00+09:00",
+      }),
+    ).rejects.toThrow(/取得できませんでした/);
+  });
+
+  it("一部失敗時は events と unreadableAccounts を返す", async () => {
+    const ok = makeFakeCalendar({
+      email: "ok@example.com",
+      list: [{ id: "e1", summary: "会議", start: { dateTime: "2026-06-15T10:00:00+09:00" } }],
+    });
+    const ng = makeFakeCalendar({ email: "ng@example.com" });
+    (ng.list as unknown as { mockRejectedValueOnce: (e: Error) => void }).mockRejectedValueOnce(
+      new Error("scopes"),
+    );
+    const ctx = { accounts: [ok.ctx.accounts[0], ng.ctx.accounts[0]] };
+    const result = (await executeTool(ctx, "list_events", {
+      timeMin: "2026-06-15T00:00:00+09:00",
+      timeMax: "2026-06-16T00:00:00+09:00",
+    })) as { events: unknown[]; unreadableAccounts: { email: string }[] };
+    expect(result.events).toHaveLength(1);
+    expect(result.unreadableAccounts[0].email).toBe("ng@example.com");
+  });
+
   it("account 指定で対象アカウントの calendar のみ使う", async () => {
     const a = makeFakeCalendar({ email: "a@example.com" });
     const b = makeFakeCalendar({ email: "b@example.com" });

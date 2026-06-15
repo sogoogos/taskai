@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import {
   listEvents,
-  listEventsForAccounts,
+  aggregateEvents,
   createEvent,
   updateEvent,
   deleteEvent,
@@ -124,6 +124,9 @@ export async function executeTool(
   name: string,
   input: Record<string, unknown>,
 ): Promise<unknown> {
+  // どのツールがどの引数で呼ばれたかをサーバログに出す（診断用）
+  console.log(`[tool] ${name} ${JSON.stringify(input)}`);
+
   // 場所検索はカレンダー連携に依存しない
   if (name === "find_places") {
     return searchPlaces({
@@ -151,7 +154,23 @@ export async function executeTool(
         return events.map((e) => ({ ...e, accountEmail: acc.email }));
       }
       // account 省略 → 全アカウント集約
-      return listEventsForAccounts(ctx.accounts, params);
+      const { events, errors } = await aggregateEvents(ctx.accounts, params);
+      console.log(
+        `[tool] list_events → ${events.length}件 / 失敗 ${errors.length}アカウント`,
+      );
+      // 全アカウントが失敗かつ0件なら「空」ではなく「エラー」として返す
+      if (events.length === 0 && errors.length > 0) {
+        throw new Error(
+          `予定を取得できませんでした（権限不足の可能性）: ${errors
+            .map((e) => `${e.email}: ${e.message}`)
+            .join("; ")}`,
+        );
+      }
+      // 一部失敗があれば events と併せて警告も返す
+      if (errors.length > 0) {
+        return { events, unreadableAccounts: errors };
+      }
+      return events;
     }
     case "create_event": {
       const acc = resolveAccount(ctx, account);

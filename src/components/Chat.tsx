@@ -111,7 +111,7 @@ export default function Chat({
   }
 
   return (
-    <section className="flex min-h-0 flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+    <section className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] p-2.5">
         <span className="text-xs text-[var(--muted)]">AIモデル</span>
         <select

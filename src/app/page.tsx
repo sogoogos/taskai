@@ -31,22 +31,23 @@ export default async function Home() {
   }
 
   return (
-    <main className="mx-auto flex h-screen max-w-6xl flex-col p-4">
-      <header className="mb-4 flex items-center justify-between">
+    <main className="mx-auto flex h-[100dvh] max-w-6xl flex-col p-3 sm:p-4">
+      <header className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-4">
         <h1 className="text-lg font-bold">TaskAI</h1>
-        <div className="flex items-center gap-3 text-sm text-[var(--muted)]">
-          <span>{session.email}</span>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted)] sm:text-sm">
+          <span className="hidden max-w-[40vw] truncate sm:inline">{session.email}</span>
           <SettingsButton />
           <a
             href="/api/auth/google?add=1"
-            className="rounded-lg border border-[var(--border)] px-3 py-1 transition hover:bg-[var(--surface-2)]"
+            className="rounded-lg border border-[var(--border)] px-2.5 py-1 transition hover:bg-[var(--surface-2)] sm:px-3"
           >
-            ＋アカウント追加
+            <span className="sm:hidden">＋追加</span>
+            <span className="hidden sm:inline">＋アカウント追加</span>
           </a>
           <form action="/api/auth/logout" method="post">
             <button
               type="submit"
-              className="rounded-lg border border-[var(--border)] px-3 py-1 transition hover:bg-[var(--surface-2)]"
+              className="rounded-lg border border-[var(--border)] px-2.5 py-1 transition hover:bg-[var(--surface-2)] sm:px-3"
             >
               ログアウト
             </button>

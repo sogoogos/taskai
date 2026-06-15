@@ -25,7 +25,7 @@ export default function RightPanel({ reloadSignal }: { reloadSignal: number }) {
   );
 
   return (
-    <aside className="flex min-h-0 flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+    <aside className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
       <div className="flex border-b border-[var(--border)]">
         {tabBtn("list", "リスト")}
         {tabBtn("timeline", "タイムライン")}

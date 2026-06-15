@@ -15,7 +15,7 @@
 | UI | React 19 + Tailwind CSS v4 | 高速にチャット UI を構築 |
 | LLM | Claude / OpenAI / Gemini を切替可能（既定 `claude-haiku-4-5`） | プロバイダ抽象化レイヤで差し替え。UI から選択可 |
 | カレンダー | `googleapis`（OAuth2 + Calendar v3） | 公式 SDK、トークン自動更新 |
-| 永続化 | `better-sqlite3`（SQLite） | MVP はシンプルに。トークン・会話を保存 |
+| 永続化 | `@libsql/client`（ローカル=SQLiteファイル / 本番=Turso） | SQLite互換で無料デプロイ可。トークン・プロフィールを保存 |
 | セッション | `iron-session`（署名付き Cookie） | ユーザー識別 |
 | テスト | Vitest | TS ネイティブで高速 |
 

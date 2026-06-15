@@ -12,7 +12,7 @@
 - **プロフィール設定**（ヘッダの⚙）：自宅住所・状況メモを登録するとアシスタントが考慮（移動時間の出発地や負荷判断に利用）
 - **日別タイムライン**：右パネルの「タイムライン」タブで、選んだ日の予定を時間軸表示（現在時刻の線つき）
 
-設計の詳細は [docs/DESIGN.md](docs/DESIGN.md) を参照。
+設計の詳細は [docs/DESIGN.md](docs/DESIGN.md)、スマホからも使える公開手順は [docs/DEPLOY.md](docs/DEPLOY.md)（Vercel + Turso・無料）を参照。
 
 ## セットアップ
 
@@ -78,7 +78,7 @@ npm run test:watch
 
 ## スタック
 
-Next.js 15 (App Router) / TypeScript / Tailwind v4 / `@anthropic-ai/sdk` / `googleapis` / `better-sqlite3` / `iron-session` / Vitest
+Next.js 16 (App Router) / TypeScript / Tailwind v4 / `@anthropic-ai/sdk` / `openai` / `@google/genai` / `googleapis` / `@libsql/client`(Turso) / `iron-session` / Vitest
 
 ## ロードマップ
 

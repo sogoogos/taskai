@@ -101,6 +101,18 @@ export default function DayTimeline({ reloadSignal = 0 }: { reloadSignal?: numbe
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 現在時刻（0時からの分）。マウント後に設定して1分ごとに更新（SSRのhydration不一致を回避）
+  const [nowMin, setNowMin] = useState<number | null>(null);
+
+  useEffect(() => {
+    const update = () => {
+      const d = new Date();
+      setNowMin(d.getHours() * 60 + d.getMinutes());
+    };
+    update();
+    const id = setInterval(update, 60000);
+    return () => clearInterval(id);
+  }, []);
 
   const load = useCallback(async (d: string) => {
     setLoading(true);
@@ -233,6 +245,20 @@ export default function DayTimeline({ reloadSignal = 0 }: { reloadSignal?: numbe
                   予定はありません
                 </p>
               )}
+              {/* 現在時刻の線（今日かつ表示範囲内のとき） */}
+              {isToday &&
+                nowMin !== null &&
+                nowMin >= rangeStart &&
+                nowMin <= rangeEnd && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 z-10"
+                    style={{ top: ((nowMin - rangeStart) / 60) * HOUR_PX }}
+                  >
+                    <div className="relative border-t-2 border-red-500">
+                      <div className="absolute -left-1 -top-[5px] h-2.5 w-2.5 rounded-full bg-red-500" />
+                    </div>
+                  </div>
+                )}
               {laidOut.map((it) => {
                 const top = ((it.s - rangeStart) / 60) * HOUR_PX;
                 const height = Math.max(18, ((it.en - it.s) / 60) * HOUR_PX - 2);

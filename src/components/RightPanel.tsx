@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Agenda from "./Agenda";
 import DayTimeline from "./DayTimeline";
+import WeekView from "./WeekView";
 import Tasks from "./Tasks";
 import Trading from "./Trading";
 
-type Tab = "list" | "timeline" | "tasks" | "trading";
+type Tab = "list" | "week" | "timeline" | "tasks" | "trading";
 
 /** 右パネル: 「リスト」「タイムライン」「タスク」「投資」をタブ切替。
  *  一度開いたタブはマウントしたまま保持し（非アクティブは CSS で非表示）、
@@ -31,7 +32,7 @@ export default function RightPanel({
     <button
       onClick={() => select(key)}
       className={
-        "flex-1 px-3 py-2 text-xs font-medium transition " +
+        "flex-1 whitespace-nowrap px-1.5 py-2 text-[11px] font-medium transition " +
         (tab === key
           ? "border-b-2 border-[var(--accent)] text-[var(--text)]"
           : "text-[var(--muted)] hover:text-[var(--text)]")
@@ -49,6 +50,7 @@ export default function RightPanel({
     <aside className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
       <div className="flex border-b border-[var(--border)]">
         {tabBtn("list", "リスト")}
+        {tabBtn("week", "週")}
         {tabBtn("timeline", "タイムライン")}
         {tabBtn("tasks", "タスク")}
         {tabBtn("trading", "投資")}
@@ -56,6 +58,11 @@ export default function RightPanel({
       {visited.has("list") && (
         <div className={pane("list")}>
           <Agenda reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
+        </div>
+      )}
+      {visited.has("week") && (
+        <div className={pane("week")}>
+          <WeekView reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
         </div>
       )}
       {visited.has("timeline") && (

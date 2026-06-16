@@ -4,11 +4,10 @@ import { useState } from "react";
 import Agenda from "./Agenda";
 import DayTimeline from "./DayTimeline";
 import WeekView from "./WeekView";
-import Tasks from "./Tasks";
 
-type Tab = "list" | "week" | "timeline" | "tasks";
+type Tab = "list" | "week" | "timeline";
 
-/** 予定パネル: 「リスト」「週」「タイムライン」「タスク」をタブ切替。
+/** 予定パネル: 「リスト」「週」「タイムライン」をタブ切替。
  *  一度開いたタブはマウントしたまま保持し（非アクティブは CSS で非表示）、
  *  切り替えるたびに再 fetch しない（初回のみ取得＝キャッシュ）。 */
 export default function RightPanel({
@@ -51,7 +50,6 @@ export default function RightPanel({
         {tabBtn("list", "リスト")}
         {tabBtn("week", "週")}
         {tabBtn("timeline", "タイムライン")}
-        {tabBtn("tasks", "タスク")}
       </div>
       {visited.has("list") && (
         <div className={pane("list")}>
@@ -66,11 +64,6 @@ export default function RightPanel({
       {visited.has("timeline") && (
         <div className={pane("timeline")}>
           <DayTimeline reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
-        </div>
-      )}
-      {visited.has("tasks") && (
-        <div className={pane("tasks")}>
-          <Tasks reloadSignal={reloadSignal} onTasksChanged={onCalendarChanged} />
         </div>
       )}
     </aside>

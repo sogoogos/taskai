@@ -82,6 +82,13 @@ const SCHEMA = `
     completed_at INTEGER
   );
   CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id);
+  CREATE TABLE IF NOT EXISTS trading_status (
+    source     TEXT PRIMARY KEY,
+    label      TEXT,
+    currency   TEXT,
+    payload    TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
 `;
 
 /** スキーマ適用（プロセス内で一度だけ実行、以降は同じPromiseを待つ） */
@@ -358,4 +365,65 @@ export async function deleteTask(userId: number, id: number): Promise<boolean> {
     args: [id, userId],
   });
   return rs.rowsAffected > 0;
+}
+
+// --- 投資（スイング取引）状況。外部(kabu-trader/EC2)から push された集計を保持 ---
+
+export interface TradingStatus {
+  source: string; // 'jp' | 'us' | 'live' など市場識別子
+  label: string | null; // 表示名（例: 日本株(ペーパー)）
+  currency: string | null; // 通貨記号（¥ / $）
+  payload: unknown; // get_summary + positions + trades 等の集計（JSON）
+  updatedAt: number;
+}
+
+function rowToTradingStatus(r: Row): TradingStatus {
+  let payload: unknown = null;
+  try {
+    payload = JSON.parse(String(r.payload));
+  } catch {
+    payload = null;
+  }
+  return {
+    source: String(r.source),
+    label: asString(r.label),
+    currency: asString(r.currency),
+    payload,
+    updatedAt: Number(r.updated_at),
+  };
+}
+
+/** 市場ごとの最新状況を upsert（外部からのプッシュ受け口） */
+export async function upsertTradingStatus(input: {
+  source: string;
+  label?: string | null;
+  currency?: string | null;
+  payload: unknown;
+}): Promise<void> {
+  const c = await db();
+  await c.execute({
+    sql: `INSERT INTO trading_status (source, label, currency, payload, updated_at)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(source) DO UPDATE SET
+            label = excluded.label,
+            currency = excluded.currency,
+            payload = excluded.payload,
+            updated_at = excluded.updated_at`,
+    args: [
+      input.source,
+      input.label ?? null,
+      input.currency ?? null,
+      JSON.stringify(input.payload ?? null),
+      Date.now(),
+    ],
+  });
+}
+
+/** 全市場の最新状況（更新が新しい順） */
+export async function listTradingStatus(): Promise<TradingStatus[]> {
+  const c = await db();
+  const rs = await c.execute(
+    "SELECT * FROM trading_status ORDER BY updated_at DESC",
+  );
+  return rs.rows.map(rowToTradingStatus);
 }

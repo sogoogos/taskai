@@ -17,6 +17,7 @@ import {
   createTask,
   updateTask,
   deleteTask,
+  listTradingStatus,
   type TaskStatus,
 } from "./db";
 
@@ -203,6 +204,16 @@ export const calendarTools: Anthropic.Tool[] = [
       required: ["id"],
     },
   },
+  {
+    name: "get_trading_status",
+    description:
+      "スイング取引(株式)の運用状況を取得する。『今の持ち株は?』『投資の成績どう?』『含み損益は?』『〇〇株売れた?』など株トレードの状況を聞かれたら呼ぶ。外部の自動売買システム(kabu-trader)が定期送信した最新スナップショットを、市場(日本株ペーパー/日本株ライブ/米国株)ごとに返す。各市場の評価額・損益率・現金・勝率・保有銘柄(含み損益)・直近の売買が含まれる。データは定期更新なので updatedAt(最終更新)も添えて伝える。読み取り専用で売買はできない。",
+    input_schema: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
 ];
 
 /** account メールから対象アカウントを解決（無ければ既定 = accounts[0]） */
@@ -239,6 +250,15 @@ export async function executeTool(
       destination: String(input.destination),
       mode: input.mode ? (String(input.mode) as TravelMode) : undefined,
     });
+  }
+
+  // 投資状況は外部プッシュ済みのスナップショットを読むだけ（連携不要）
+  if (name === "get_trading_status") {
+    const statuses = await listTradingStatus();
+    if (statuses.length === 0) {
+      return { statuses: [], note: "取引状況のデータがまだありません（kabu-trader からの送信待ち）。" };
+    }
+    return { statuses };
   }
 
   // タスク(ToDo)はカレンダー連携に依存しない。userId が必要。

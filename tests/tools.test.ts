@@ -3,7 +3,7 @@ import { calendarTools, executeTool } from "@/lib/tools";
 import { makeFakeCalendar } from "./helpers/fakeCalendar";
 
 describe("calendarTools 定義", () => {
-  it("11のツール（カレンダー4 + 場所 + 移動時間 + メール + タスク4）が定義されている", () => {
+  it("12のツール（カレンダー4 + 場所 + 移動 + メール + タスク4 + 投資）が定義されている", () => {
     const names = calendarTools.map((t) => t.name).sort();
     expect(names).toEqual(
       [
@@ -12,6 +12,7 @@ describe("calendarTools 定義", () => {
         "delete_event",
         "delete_task",
         "find_places",
+        "get_trading_status",
         "list_events",
         "list_tasks",
         "search_emails",

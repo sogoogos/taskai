@@ -4,10 +4,11 @@ import { useState } from "react";
 import Agenda from "./Agenda";
 import DayTimeline from "./DayTimeline";
 import Tasks from "./Tasks";
+import Trading from "./Trading";
 
-type Tab = "list" | "timeline" | "tasks";
+type Tab = "list" | "timeline" | "tasks" | "trading";
 
-/** 右パネル: 「リスト」「タイムライン」「タスク」をタブ切替 */
+/** 右パネル: 「リスト」「タイムライン」「タスク」「投資」をタブ切替 */
 export default function RightPanel({
   reloadSignal,
   onCalendarChanged,
@@ -37,6 +38,7 @@ export default function RightPanel({
         {tabBtn("list", "リスト")}
         {tabBtn("timeline", "タイムライン")}
         {tabBtn("tasks", "タスク")}
+        {tabBtn("trading", "投資")}
       </div>
       {tab === "list" && (
         <Agenda reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
@@ -47,6 +49,7 @@ export default function RightPanel({
       {tab === "tasks" && (
         <Tasks reloadSignal={reloadSignal} onTasksChanged={onCalendarChanged} />
       )}
+      {tab === "trading" && <Trading reloadSignal={reloadSignal} />}
     </aside>
   );
 }

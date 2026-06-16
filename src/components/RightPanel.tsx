@@ -5,11 +5,10 @@ import Agenda from "./Agenda";
 import DayTimeline from "./DayTimeline";
 import WeekView from "./WeekView";
 import Tasks from "./Tasks";
-import Trading from "./Trading";
 
-type Tab = "list" | "week" | "timeline" | "tasks" | "trading";
+type Tab = "list" | "week" | "timeline" | "tasks";
 
-/** 右パネル: 「リスト」「タイムライン」「タスク」「投資」をタブ切替。
+/** 予定パネル: 「リスト」「週」「タイムライン」「タスク」をタブ切替。
  *  一度開いたタブはマウントしたまま保持し（非アクティブは CSS で非表示）、
  *  切り替えるたびに再 fetch しない（初回のみ取得＝キャッシュ）。 */
 export default function RightPanel({
@@ -53,7 +52,6 @@ export default function RightPanel({
         {tabBtn("week", "週")}
         {tabBtn("timeline", "タイムライン")}
         {tabBtn("tasks", "タスク")}
-        {tabBtn("trading", "投資")}
       </div>
       {visited.has("list") && (
         <div className={pane("list")}>
@@ -73,11 +71,6 @@ export default function RightPanel({
       {visited.has("tasks") && (
         <div className={pane("tasks")}>
           <Tasks reloadSignal={reloadSignal} onTasksChanged={onCalendarChanged} />
-        </div>
-      )}
-      {visited.has("trading") && (
-        <div className={pane("trading")}>
-          <Trading reloadSignal={reloadSignal} />
         </div>
       )}
     </aside>

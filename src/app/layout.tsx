@@ -4,6 +4,13 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "TaskAI — チャットで予定管理",
   description: "Claude とチャットして Google カレンダーに予定を追加・編集できるツール",
+  manifest: "/manifest.webmanifest",
+  // iOS のホーム画面アプリ（standalone）として扱う
+  appleWebApp: {
+    capable: true,
+    title: "TaskAI",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {

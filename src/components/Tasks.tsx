@@ -159,7 +159,8 @@ export default function Tasks({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") add();
+              // IME 変換確定の Enter（composing 中）は無視する
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) add();
             }}
             placeholder="タスクを追加…"
             className="min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1.5 text-sm outline-none focus:border-[var(--accent)]"

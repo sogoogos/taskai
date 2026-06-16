@@ -198,6 +198,10 @@ export default function Chat({
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            // IME 変換確定の Enter ではフォーム送信しない
+            if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault();
+          }}
           placeholder="例: 明日の15時に歯医者を入れて"
           disabled={busy}
           className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-sm outline-none focus:border-[var(--accent)] disabled:opacity-60"

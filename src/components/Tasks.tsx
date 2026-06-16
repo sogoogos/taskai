@@ -58,6 +58,11 @@ export default function Tasks({
   const [title, setTitle] = useState("");
   const [due, setDue] = useState<string>(todayStr());
   const [scope, setScope] = useState<"today" | "all">("today");
+  // インライン編集中のタスク
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDue, setEditDue] = useState("");
+  const [editNotes, setEditNotes] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,7 +103,7 @@ export default function Tasks({
   }, [title, due, load, onTasksChanged]);
 
   const patch = useCallback(
-    async (id: number, fields: Partial<Pick<Task, "status" | "title" | "dueDate">>) => {
+    async (id: number, fields: Partial<Pick<Task, "status" | "title" | "dueDate" | "notes">>) => {
       // 楽観的更新
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...fields } : t)));
       try {
@@ -134,6 +139,28 @@ export default function Tasks({
     },
     [load, onTasksChanged],
   );
+
+  const startEdit = useCallback((t: Task) => {
+    setEditId(t.id);
+    setEditTitle(t.title);
+    setEditDue(t.dueDate ?? "");
+    setEditNotes(t.notes ?? "");
+  }, []);
+
+  const cancelEdit = useCallback(() => setEditId(null), []);
+
+  const saveEdit = useCallback(async () => {
+    if (editId === null) return;
+    const title = editTitle.trim();
+    if (!title) return;
+    const id = editId;
+    setEditId(null);
+    await patch(id, {
+      title,
+      dueDate: editDue || null,
+      notes: editNotes.trim() || null,
+    });
+  }, [editId, editTitle, editDue, editNotes, patch]);
 
   const today = todayStr();
   const visible = useMemo(() => {
@@ -237,6 +264,77 @@ export default function Tasks({
         {visible.map((t) => {
           const ui = STATUS_UI[t.status];
           const overdue = t.status !== "done" && t.dueDate !== null && t.dueDate < today;
+
+          if (editId === t.id) {
+            return (
+              <div
+                key={t.id}
+                className="space-y-1.5 rounded-xl border border-[var(--accent)] bg-[var(--surface-2)] p-2.5"
+              >
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit();
+                    if (e.key === "Escape") cancelEdit();
+                  }}
+                  autoFocus
+                  placeholder="タスク名"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm outline-none focus:border-[var(--accent)]"
+                />
+                <input
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit();
+                    if (e.key === "Escape") cancelEdit();
+                  }}
+                  placeholder="メモ（任意）"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[11px] outline-none focus:border-[var(--accent)]"
+                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={editDue}
+                    onChange={(e) => setEditDue(e.target.value)}
+                    className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[11px] outline-none focus:border-[var(--accent)]"
+                  />
+                  {editDue && (
+                    <button
+                      onClick={() => setEditDue("")}
+                      className="text-[11px] text-[var(--muted)] underline hover:text-[var(--text)]"
+                    >
+                      期日なし
+                    </button>
+                  )}
+                  <span className="flex-1" />
+                  <button
+                    onClick={() => {
+                      cancelEdit();
+                      remove(t.id);
+                    }}
+                    className="rounded-lg border border-[var(--border)] px-2.5 py-1 text-xs text-red-400 transition hover:bg-red-500/10"
+                  >
+                    削除
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    className="rounded-lg border border-[var(--border)] px-2.5 py-1 text-xs text-[var(--muted)] transition hover:bg-[var(--surface)]"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={saveEdit}
+                    disabled={!editTitle.trim()}
+                    className="rounded-lg bg-[var(--accent)] px-3 py-1 text-xs font-medium text-white transition hover:brightness-110 disabled:opacity-40"
+                  >
+                    保存
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div
               key={t.id}
@@ -252,7 +350,11 @@ export default function Tasks({
               >
                 {ui.mark}
               </button>
-              <div className="min-w-0 flex-1">
+              <button
+                onClick={() => startEdit(t)}
+                className="min-w-0 flex-1 text-left"
+                title="タップで編集"
+              >
                 <div
                   className={
                     "text-sm " +
@@ -271,14 +373,23 @@ export default function Tasks({
                   )}
                   {t.notes && <span className="text-[var(--muted)]">・{t.notes}</span>}
                 </div>
-              </div>
-              <button
-                onClick={() => remove(t.id)}
-                title="削除"
-                className="mt-0.5 shrink-0 text-[var(--muted)] opacity-0 transition hover:text-red-400 group-hover:opacity-100"
-              >
-                ✕
               </button>
+              <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
+                <button
+                  onClick={() => startEdit(t)}
+                  title="編集"
+                  className="text-[var(--muted)] opacity-0 transition hover:text-[var(--text)] group-hover:opacity-100"
+                >
+                  ✎
+                </button>
+                <button
+                  onClick={() => remove(t.id)}
+                  title="削除"
+                  className="text-[var(--muted)] opacity-0 transition hover:text-red-400 group-hover:opacity-100"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           );
         })}

@@ -229,6 +229,15 @@ export default function DayTimeline({
         >
           今日
         </button>
+        <button
+          onClick={() => load(date)}
+          disabled={loading}
+          className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)] transition hover:bg-[var(--surface-2)] disabled:opacity-40"
+          aria-label="更新"
+          title="更新"
+        >
+          ⟳
+        </button>
       </div>
 
       {/* アカウント色の凡例（複数連携時のみ） */}

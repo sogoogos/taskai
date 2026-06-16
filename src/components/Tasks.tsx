@@ -211,7 +211,18 @@ export default function Tasks({
             </button>
           ))}
         </div>
-        <span className="text-xs text-[var(--muted)]">残り {openCount} 件</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[var(--muted)]">残り {openCount} 件</span>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)] transition hover:bg-[var(--surface-2)] disabled:opacity-40"
+            aria-label="更新"
+            title="更新"
+          >
+            ⟳
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 space-y-1.5 overflow-y-auto p-3">

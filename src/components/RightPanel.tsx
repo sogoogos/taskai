@@ -8,7 +8,9 @@ import Trading from "./Trading";
 
 type Tab = "list" | "timeline" | "tasks" | "trading";
 
-/** 右パネル: 「リスト」「タイムライン」「タスク」「投資」をタブ切替 */
+/** 右パネル: 「リスト」「タイムライン」「タスク」「投資」をタブ切替。
+ *  一度開いたタブはマウントしたまま保持し（非アクティブは CSS で非表示）、
+ *  切り替えるたびに再 fetch しない（初回のみ取得＝キャッシュ）。 */
 export default function RightPanel({
   reloadSignal,
   onCalendarChanged,
@@ -17,10 +19,17 @@ export default function RightPanel({
   onCalendarChanged: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("list");
+  // 訪問済みのタブだけマウントする（未訪問は不要な取得を避けて遅延マウント）
+  const [visited, setVisited] = useState<Set<Tab>>(new Set<Tab>(["list"]));
+
+  const select = (key: Tab) => {
+    setTab(key);
+    setVisited((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  };
 
   const tabBtn = (key: Tab, label: string) => (
     <button
-      onClick={() => setTab(key)}
+      onClick={() => select(key)}
       className={
         "flex-1 px-3 py-2 text-xs font-medium transition " +
         (tab === key
@@ -32,6 +41,10 @@ export default function RightPanel({
     </button>
   );
 
+  // 非アクティブは hidden（display:none）で保持。アクティブは flex で領域を満たす。
+  const pane = (key: Tab) =>
+    "min-h-0 flex-1 flex-col " + (tab === key ? "flex" : "hidden");
+
   return (
     <aside className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
       <div className="flex border-b border-[var(--border)]">
@@ -40,16 +53,26 @@ export default function RightPanel({
         {tabBtn("tasks", "タスク")}
         {tabBtn("trading", "投資")}
       </div>
-      {tab === "list" && (
-        <Agenda reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
+      {visited.has("list") && (
+        <div className={pane("list")}>
+          <Agenda reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
+        </div>
       )}
-      {tab === "timeline" && (
-        <DayTimeline reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
+      {visited.has("timeline") && (
+        <div className={pane("timeline")}>
+          <DayTimeline reloadSignal={reloadSignal} onCalendarChanged={onCalendarChanged} />
+        </div>
       )}
-      {tab === "tasks" && (
-        <Tasks reloadSignal={reloadSignal} onTasksChanged={onCalendarChanged} />
+      {visited.has("tasks") && (
+        <div className={pane("tasks")}>
+          <Tasks reloadSignal={reloadSignal} onTasksChanged={onCalendarChanged} />
+        </div>
       )}
-      {tab === "trading" && <Trading reloadSignal={reloadSignal} />}
+      {visited.has("trading") && (
+        <div className={pane("trading")}>
+          <Trading reloadSignal={reloadSignal} />
+        </div>
+      )}
     </aside>
   );
 }

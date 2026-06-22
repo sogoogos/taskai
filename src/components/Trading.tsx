@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import type { TradingPayload, TradingStrategy } from "@/lib/trading";
+import type { TradingPayload, TradingStrategy, TradingSignal } from "@/lib/trading";
 
 interface StatusItem {
   source: string;
@@ -149,6 +149,9 @@ function MarketView({ item }: { item: StatusItem }) {
         </div>
       </div>
 
+      {/* 現在のシグナル */}
+      <SignalsView signals={p.signals} signalsAt={p.signalsAt} />
+
       {/* 保有銘柄 */}
       <div>
         <div className="mb-1 flex items-center justify-between">
@@ -271,6 +274,83 @@ function exitValue(key: string, v: number | boolean): string {
   if (key.includes("days")) return `${v}日`;
   if (key.includes("hours")) return `${v}時間`;
   return String(v);
+}
+
+// シグナル種別 → 見た目
+const SIGNAL_UI: Record<string, { label: string; cls: string; buy: boolean }> = {
+  STRONG_BUY: { label: "強い買い", cls: "bg-green-500/20 text-green-400", buy: true },
+  BUY: { label: "買い", cls: "bg-green-500/10 text-green-400", buy: true },
+  SELL: { label: "売り", cls: "bg-red-500/10 text-red-400", buy: false },
+  STRONG_SELL: { label: "強い売り", cls: "bg-red-500/20 text-red-400", buy: false },
+};
+
+function signalTime(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return relTime(d.getTime());
+}
+
+function SignalRow({ s }: { s: TradingSignal }) {
+  const ui = SIGNAL_UI[s.signal] ?? { label: s.signal, cls: "text-[var(--muted)]", buy: false };
+  return (
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 truncate text-xs font-medium">
+          {s.ticker}
+          {s.name ? <span className="ml-1 text-[var(--muted)]">{s.name}</span> : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className={"rounded-full px-1.5 py-0.5 text-[10px] font-semibold " + ui.cls}>
+            {ui.label}
+          </span>
+          <span className="text-[10px] text-[var(--muted)]">スコア {s.score > 0 ? "+" : ""}{s.score}</span>
+        </div>
+      </div>
+      {s.reasons.length > 0 && (
+        <div className="mt-0.5 truncate text-[10px] text-[var(--muted)]" title={s.reasons.join(" / ")}>
+          {s.reasons.slice(0, 3).join(" / ")}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SignalsView({ signals, signalsAt }: { signals: TradingSignal[]; signalsAt: string | null }) {
+  const buys = signals.filter((s) => (SIGNAL_UI[s.signal]?.buy ?? false)).sort((a, b) => b.score - a.score);
+  const sells = signals.filter((s) => !(SIGNAL_UI[s.signal]?.buy ?? true)).sort((a, b) => a.score - b.score);
+  const when = signalTime(signalsAt);
+
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-xs font-semibold">現在のシグナル</span>
+        {when && <span className="text-[10px] text-[var(--muted)]">{when}時点</span>}
+      </div>
+      {signals.length === 0 ? (
+        <p className="text-xs text-[var(--muted)]">今はシグナルが出ていません（または monitor 未送信）。</p>
+      ) : (
+        <div className="space-y-2">
+          {buys.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-[10px] font-medium text-green-400">買い {buys.length}件</div>
+              {buys.map((s) => (
+                <SignalRow key={`b-${s.ticker}`} s={s} />
+              ))}
+            </div>
+          )}
+          {sells.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-[10px] font-medium text-red-400">売り {sells.length}件</div>
+              {sells.map((s) => (
+                <SignalRow key={`s-${s.ticker}`} s={s} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function StrategyView({ strategy }: { strategy: TradingStrategy }) {

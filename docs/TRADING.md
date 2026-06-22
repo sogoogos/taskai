@@ -48,7 +48,10 @@ EC2: kabu-trader                         Vercel: TaskAI                  Turso
                   "buy_vetoes": ["ML弱気は見送る", "買われすぎは見送る"],
                   "exit_rules": { "stop_loss_pct": 0.05, "take_profit_pct": 0.15,
                                   "trailing_stop_enabled": true, "max_hold_days": 30 },
-                  "position_sizing": { "position_size_pct": 0.1, "max_positions": 5 } }
+                  "position_sizing": { "position_size_pct": 0.1, "max_positions": 5 } },
+    "signals_at": "2026-06-22T14:30:00+09:00",
+    "signals": [{ "ticker": "2371.T", "name": "カカクコム", "signal": "BUY", "score": 5,
+                  "price": 3400, "reasons": ["MACD bullish crossover", "RSI oversold (28.0)"] }]
   }
 }
 ```
@@ -61,6 +64,19 @@ EC2: kabu-trader                         Vercel: TaskAI                  Turso
 
 - 骨子: 14 指標を各 −1〜+1 で採点 → 重み付けして合算 → 絶対値が `signal_threshold` 以上で BUY/SELL、`strong_signal_threshold` 以上で強い BUY/SELL。`buy_vetoes`（ML 弱気・買われすぎ）の新規買いは見送る。決済は `exit_rules`（損切り/利確/トレーリング/最大保有日数）。
 - strategy 未送信（旧バージョンの push）なら `null` になり、チャットは「kabu-trader 側が未送信」と案内します。
+
+## 現在のシグナル（signals）の取り込み
+
+`payload.signals` はウォッチリスト各銘柄の「現在の」売買シグナル（HOLD は除く）です。push 自身は再計算しません（全銘柄の OHLCV 取得は重く cron に不向き）。代わりに **24/7 稼働する monitor が `_analyze_signals()` のたびに `state_dir/signals.json` へスナップショットを書き出し**、push がそれを読んで同梱します。
+
+```
+monitor (5分間隔) ── _analyze_signals → state_dir/signals.json（原子的に書換）
+push_taskai (cron) ── signals.json を読む → payload.signals / signals_at
+```
+
+- シグナルの鮮度は monitor の周期（既定 `monitor.interval_seconds=300`＝5分）と push の周期に依存します。`signals_at`（算出時刻）を必ず添えて鮮度を判断します。
+- monitor が動いていない／`state_dir` 未設定なら `signals` は空配列になり、チャット・投資タブは「今はシグナルなし、または未送信」と案内します。
+- チャットで「今どの銘柄に BUY/SELL シグナルが出てる?」と聞くと、`get_trading_status` の `signals` から BUY系/SELL系に分けて回答します（投資タブにも「現在のシグナル」を表示）。
 
 ## セットアップ
 

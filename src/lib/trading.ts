@@ -60,12 +60,24 @@ export interface TradingStrategy {
   description: string | null; // 任意の人間可読サマリ
 }
 
+/** ウォッチリスト各銘柄の「現在の」売買シグナル（monitor が定期計算）。 */
+export interface TradingSignal {
+  ticker: string;
+  name: string;
+  signal: string; // STRONG_BUY / BUY / SELL / STRONG_SELL（HOLD は含まない）
+  score: number; // 合成スコア（+で買い寄り / -で売り寄り）
+  price: number; // 判定時の価格
+  reasons: string[]; // 寄与した指標の説明
+}
+
 export interface TradingPayload {
   isLive: boolean;
   summary: TradingSummary;
   positions: TradingPosition[];
   trades: TradingTrade[]; // 直近のみ
   strategy: TradingStrategy | null; // BUY/SELL 判定ロジック（未送信なら null）
+  signals: TradingSignal[]; // 現在出ている売買シグナル（monitor 未送信なら空）
+  signalsAt: string | null; // シグナルの算出時刻（ISO8601）
 }
 
 function num(v: unknown): number {
@@ -203,5 +215,26 @@ export function normalizeTradingPayload(raw: unknown): TradingPayload {
 
   const strategy = normalizeStrategy(o.strategy);
 
-  return { isLive: Boolean(o.is_live ?? o.isLive), summary, positions, trades, strategy };
+  const signals: TradingSignal[] = Array.isArray(o.signals)
+    ? (o.signals as Record<string, unknown>[]).map((x) => ({
+        ticker: str(x.ticker),
+        name: str(x.name),
+        signal: str(x.signal),
+        score: num(x.score),
+        price: num(x.price),
+        reasons: Array.isArray(x.reasons) ? (x.reasons as unknown[]).map(str).filter(Boolean) : [],
+      }))
+    : [];
+  const signalsAtRaw = get(o, "signals_at", "signalsAt");
+  const signalsAt = signalsAtRaw ? str(signalsAtRaw) : null;
+
+  return {
+    isLive: Boolean(o.is_live ?? o.isLive),
+    summary,
+    positions,
+    trades,
+    strategy,
+    signals,
+    signalsAt,
+  };
 }

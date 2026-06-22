@@ -57,6 +57,33 @@ describe("normalizeTradingPayload", () => {
     expect(p.trades).toEqual([]);
     expect(p.isLive).toBe(false);
     expect(p.strategy).toBeNull();
+    expect(p.signals).toEqual([]);
+    expect(p.signalsAt).toBeNull();
+  });
+
+  it("signals(現在の売買シグナル)を正規化する", () => {
+    const p = normalizeTradingPayload({
+      summary: {},
+      signals_at: "2026-06-22T14:30:00+09:00",
+      signals: [
+        {
+          ticker: "2371.T",
+          name: "カカクコム",
+          signal: "BUY",
+          score: 5,
+          price: 3400,
+          reasons: ["MACD bullish crossover", "", "RSI oversold (28.0)"],
+        },
+        { ticker: "9984.T", name: "SBG", signal: "STRONG_SELL", score: -8, price: 9000 },
+      ],
+    });
+    expect(p.signalsAt).toBe("2026-06-22T14:30:00+09:00");
+    expect(p.signals).toHaveLength(2);
+    expect(p.signals[0]).toMatchObject({ ticker: "2371.T", signal: "BUY", score: 5 });
+    // 空文字 reason は除外
+    expect(p.signals[0].reasons).toEqual(["MACD bullish crossover", "RSI oversold (28.0)"]);
+    // reasons 欠損は空配列
+    expect(p.signals[1].reasons).toEqual([]);
   });
 
   it("strategy(判定ロジック)を正規化する（indicators は重み降順、決済ルールは number/boolean 保持）", () => {

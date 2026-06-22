@@ -217,7 +217,7 @@ export const calendarTools: Anthropic.Tool[] = [
   {
     name: "get_trading_status",
     description:
-      "スイング取引(株式)の運用状況を取得する。『今の持ち株は?』『投資の成績どう?』『含み損益は?』『〇〇株売れた?』など株トレードの状況を聞かれたら呼ぶ。外部の自動売買システム(kabu-trader)が定期送信した最新スナップショットを、市場(日本株ペーパー/日本株ライブ/米国株)ごとに返す。各市場の評価額・損益率・現金・勝率・保有銘柄(含み損益)・直近の売買が含まれる。データは定期更新なので updatedAt(最終更新)も添えて伝える。読み取り専用で売買はできない。",
+      "スイング取引(株式)の運用状況と判定ロジックを取得する。『今の持ち株は?』『投資の成績どう?』『含み損益は?』『〇〇株売れた?』など状況の質問に加え、『kabu-trader はどうやって売買を決めてる?』『BUY/SELL の判定基準は?』『損切りラインは?』など判定ロジックを聞かれたときも呼ぶ。外部の自動売買システム(kabu-trader)が定期送信した最新スナップショットを市場(日本株ペーパー/日本株ライブ/米国株)ごとに返す。各市場の評価額・損益率・現金・勝率・保有銘柄(含み損益)・直近の売買(各売買に reason)・strategy(判定ロジック)を含む。strategy には name・signalThreshold/strongSignalThreshold(このスコアで BUY/SELL/強い BUY/SELL)・indicators(重み付き指標群、合成スコアの内訳)・params(各指標のパラメータ)・buyVetoes(BUYを見送る条件)・exitRules(損切り/利確/トレーリング/最大保有日数 等の決済ルール)・positionSizing が入る。判定ロジックを聞かれたら strategy を噛み砕いて説明する(全14指標を加重スコア化→合計がしきい値超えで売買、という骨子＋主要指標と決済ルール)。strategy が null なら『kabu-trader 側が未送信』と伝える。データは定期更新なので updatedAt も添える。読み取り専用で売買はできない。",
     input_schema: {
       type: "object",
       properties: {},

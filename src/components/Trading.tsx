@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import type { TradingPayload } from "@/lib/trading";
+import type { TradingPayload, TradingStrategy } from "@/lib/trading";
 
 interface StatusItem {
   source: string;
@@ -225,7 +225,109 @@ function MarketView({ item }: { item: StatusItem }) {
           </div>
         </div>
       )}
+
+      {/* 判定ロジック */}
+      {p.strategy && <StrategyView strategy={p.strategy} />}
     </div>
+  );
+}
+
+// 指標キー → 日本語ラベル
+const INDICATOR_LABEL: Record<string, string> = {
+  sma: "移動平均(SMA)",
+  rsi: "RSI",
+  macd: "MACD",
+  bollinger: "ボリンジャー",
+  volume: "出来高",
+  ichimoku: "一目均衡表",
+  mfi: "MFI(資金流入)",
+  adx: "ADX(トレンド強度)",
+  relative_strength: "相対強度",
+  ml: "ML予測",
+  sentiment: "ニュース感情",
+  earnings: "決算サプライズ",
+  sector_spillover: "同業決算波及",
+  accumulation: "出来高蓄積",
+};
+
+// 決済ルールキー → 日本語ラベル
+const EXIT_LABEL: Record<string, string> = {
+  stop_loss_pct: "損切り",
+  take_profit_pct: "利確",
+  trailing_stop_enabled: "トレーリングストップ",
+  trailing_stop_activate_pct: "トレーリング発動",
+  trailing_stop_distance_pct: "トレーリング幅",
+  max_hold_days: "最大保有日数",
+  rotation_enabled: "ローテーション",
+  rotation_max_pnl_pct: "ローテーション閾値",
+  rotation_min_hold_hours: "ローテーション最短保有",
+  reentry_cooldown_days: "再エントリー待機",
+};
+
+// 0〜1 の小数は % 表記、それ以外はそのまま
+function exitValue(key: string, v: number | boolean): string {
+  if (typeof v === "boolean") return v ? "有効" : "無効";
+  if (key.endsWith("_pct") && Math.abs(v) <= 1) return `${(v * 100).toFixed(1)}%`;
+  if (key.includes("days")) return `${v}日`;
+  if (key.includes("hours")) return `${v}時間`;
+  return String(v);
+}
+
+function StrategyView({ strategy }: { strategy: TradingStrategy }) {
+  const top = strategy.indicators.slice(0, 6);
+  return (
+    <details className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-3">
+      <summary className="cursor-pointer text-xs font-semibold">
+        判定ロジック（BUY/SELL の決め方）
+      </summary>
+      <div className="mt-2 space-y-2 text-[11px] text-[var(--muted)]">
+        <p className="leading-relaxed text-[var(--text)]">
+          {strategy.indicators.length}指標を各 −1〜+1 で採点し重み付けして合算。合計の絶対値が{" "}
+          <b>{strategy.signalThreshold}</b> 以上で BUY/SELL、
+          <b>{strategy.strongSignalThreshold}</b> 以上で強い BUY/SELL。
+        </p>
+
+        <div>
+          <div className="mb-0.5 font-medium text-[var(--text)]">主な指標（重み順）</div>
+          <div className="flex flex-wrap gap-1">
+            {top.map((ind) => (
+              <span
+                key={ind.key}
+                className="rounded-full bg-[var(--surface)] px-2 py-0.5"
+                title={`重み ${ind.weight}`}
+              >
+                {INDICATOR_LABEL[ind.key] ?? ind.key} ×{ind.weight}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {strategy.buyVetoes.length > 0 && (
+          <div>
+            <div className="mb-0.5 font-medium text-[var(--text)]">買いを見送る条件</div>
+            <ul className="list-disc space-y-0.5 pl-4">
+              {strategy.buyVetoes.map((v, i) => (
+                <li key={i}>{v}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {Object.keys(strategy.exitRules).length > 0 && (
+          <div>
+            <div className="mb-0.5 font-medium text-[var(--text)]">決済ルール</div>
+            <div className="grid grid-cols-2 gap-1">
+              {Object.entries(strategy.exitRules).map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-1 rounded-md bg-[var(--surface)] px-2 py-1">
+                  <span>{EXIT_LABEL[k] ?? k}</span>
+                  <span className="text-[var(--text)]">{exitValue(k, v)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 

@@ -56,6 +56,54 @@ describe("normalizeTradingPayload", () => {
     expect(p.positions).toEqual([]);
     expect(p.trades).toEqual([]);
     expect(p.isLive).toBe(false);
+    expect(p.strategy).toBeNull();
+  });
+
+  it("strategy(判定ロジック)を正規化する（indicators は重み降順、決済ルールは number/boolean 保持）", () => {
+    const p = normalizeTradingPayload({
+      summary: {},
+      strategy: {
+        name: "swing_composite",
+        benchmark: "Nikkei 225",
+        signal_threshold: 4,
+        strong_signal_threshold: 7,
+        indicators: [
+          { key: "sma", weight: 1.5 },
+          { key: "ml", weight: 3.0 },
+          { key: "ichimoku", weight: 2.5 },
+        ],
+        params: { rsi_oversold: 30, rsi_overbought: 70, bad: "x" },
+        buy_vetoes: ["ML 弱気は見送る", ""],
+        exit_rules: { stop_loss_pct: 0.05, trailing_stop_enabled: true, max_hold_days: 30 },
+        position_sizing: { position_size_pct: 0.1, max_positions: 5 },
+        description: "合成スコア戦略",
+      },
+    });
+    const s = p.strategy!;
+    expect(s.name).toBe("swing_composite");
+    expect(s.signalThreshold).toBe(4);
+    expect(s.strongSignalThreshold).toBe(7);
+    // 重み降順に並ぶ
+    expect(s.indicators.map((i) => i.key)).toEqual(["ml", "ichimoku", "sma"]);
+    // params は数値のみ（"bad" は捨てる）
+    expect(s.params).toEqual({ rsi_oversold: 30, rsi_overbought: 70 });
+    // 空文字の veto は除外
+    expect(s.buyVetoes).toEqual(["ML 弱気は見送る"]);
+    // boolean を保持
+    expect(s.exitRules.trailing_stop_enabled).toBe(true);
+    expect(s.exitRules.stop_loss_pct).toBe(0.05);
+    expect(s.positionSizing.max_positions).toBe(5);
+  });
+
+  it("strategy.indicators が dict 形式でも配列化する", () => {
+    const p = normalizeTradingPayload({
+      summary: {},
+      strategy: { name: "x", indicators: { rsi: 1.5, macd: 2.0 } },
+    });
+    expect(p.strategy!.indicators).toEqual([
+      { key: "macd", weight: 2.0 },
+      { key: "rsi", weight: 1.5 },
+    ]);
   });
 });
 

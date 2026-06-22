@@ -40,12 +40,27 @@ EC2: kabu-trader                         Vercel: TaskAI                  Turso
     "positions": [{ "ticker": "2371.T", "name": "...", "shares": 100, "entry_price": 3332,
                     "current_price": 3500, "pnl": 16800, "pnl_pct": 5.0, "entry_date": "2026-06-05" }],
     "trades": [{ "timestamp": "2026-06-10 14:00", "action": "SELL", "ticker": "...", "price": 0,
-                 "shares": 100, "pnl": -5000, "pnl_pct": -0.5, "reason": "stop_loss" }]
+                 "shares": 100, "pnl": -5000, "pnl_pct": -0.5, "reason": "stop_loss" }],
+    "strategy": { "name": "swing_composite", "benchmark": "Nikkei 225",
+                  "signal_threshold": 4, "strong_signal_threshold": 7,
+                  "indicators": [{ "key": "ml", "weight": 3.0 }, { "key": "ichimoku", "weight": 2.5 }],
+                  "params": { "rsi_oversold": 30, "rsi_overbought": 70 },
+                  "buy_vetoes": ["ML弱気は見送る", "買われすぎは見送る"],
+                  "exit_rules": { "stop_loss_pct": 0.05, "take_profit_pct": 0.15,
+                                  "trailing_stop_enabled": true, "max_hold_days": 30 },
+                  "position_sizing": { "position_size_pct": 0.1, "max_positions": 5 } }
   }
 }
 ```
 
 `payload` は `src/lib/trading.ts` の `normalizeTradingPayload` で正規化されるため、snake_case / camelCase どちらでも、欠損があっても安全に取り込めます。
+
+## 判定ロジック（strategy）の表示
+
+`payload.strategy` は kabu-trader の BUY/SELL 判定ロジックの概要で、`scripts/push_taskai.py` の `build_strategy()` が config（`strategy.params` と `backtest`）から組み立てて送ります。これにより、TaskAI のチャットで「kabu-trader はどう売買を判定してる?」「損切りラインは?」と聞くと `get_trading_status` の `strategy` を読んで説明できます（投資タブにも「判定ロジック」の折りたたみで表示）。
+
+- 骨子: 14 指標を各 −1〜+1 で採点 → 重み付けして合算 → 絶対値が `signal_threshold` 以上で BUY/SELL、`strong_signal_threshold` 以上で強い BUY/SELL。`buy_vetoes`（ML 弱気・買われすぎ）の新規買いは見送る。決済は `exit_rules`（損切り/利確/トレーリング/最大保有日数）。
+- strategy 未送信（旧バージョンの push）なら `null` になり、チャットは「kabu-trader 側が未送信」と案内します。
 
 ## セットアップ
 

@@ -41,11 +41,31 @@ export interface TradingTrade {
   reason?: string;
 }
 
+/** BUY/SELL の判定ロジック概要。kabu-trader が config から組み立てて送る。 */
+export interface TradingStrategyIndicator {
+  key: string; // 指標キー（sma/rsi/macd/ichimoku/ml/sentiment ...）
+  weight: number; // 合成スコアへの重み
+}
+
+export interface TradingStrategy {
+  name: string; // 例 swing_composite
+  benchmark: string | null; // 相対強度の基準（例 Nikkei 225）
+  signalThreshold: number; // |スコア| がこれ以上で BUY/SELL
+  strongSignalThreshold: number; // これ以上で STRONG_BUY/SELL
+  indicators: TradingStrategyIndicator[]; // 重み付き指標（重み降順）
+  params: Record<string, number>; // 主要パラメータ（sma_short, rsi_oversold ...）
+  buyVetoes: string[]; // BUY を見送る条件（人間可読）
+  exitRules: Record<string, number | boolean>; // 損切り/利確/トレーリング/最大保有日数 等
+  positionSizing: Record<string, number>; // position_size_pct, max_positions 等
+  description: string | null; // 任意の人間可読サマリ
+}
+
 export interface TradingPayload {
   isLive: boolean;
   summary: TradingSummary;
   positions: TradingPosition[];
   trades: TradingTrade[]; // 直近のみ
+  strategy: TradingStrategy | null; // BUY/SELL 判定ロジック（未送信なら null）
 }
 
 function num(v: unknown): number {
@@ -54,6 +74,80 @@ function num(v: unknown): number {
 }
 function str(v: unknown): string {
   return v === null || v === undefined ? "" : String(v);
+}
+
+/** snake_case / camelCase どちらのキーでも引ける */
+function get(o: Record<string, unknown>, ...keys: string[]): unknown {
+  for (const k of keys) if (o[k] !== undefined) return o[k];
+  return undefined;
+}
+
+/** 数値だけを残す浅いレコード化（混入した非数値は捨てる） */
+function numberRecord(v: unknown): Record<string, number> {
+  if (!v || typeof v !== "object") return {};
+  const out: Record<string, number> = {};
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    const n = typeof val === "number" ? val : Number(val);
+    if (Number.isFinite(n)) out[k] = n;
+  }
+  return out;
+}
+
+/** number/boolean を残すレコード化（損切り等は両方混じる） */
+function scalarRecord(v: unknown): Record<string, number | boolean> {
+  if (!v || typeof v !== "object") return {};
+  const out: Record<string, number | boolean> = {};
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof val === "boolean") out[k] = val;
+    else {
+      const n = typeof val === "number" ? val : Number(val);
+      if (Number.isFinite(n)) out[k] = n;
+    }
+  }
+  return out;
+}
+
+/**
+ * 判定ロジック概要を正規化する。indicators は {key:weight} の dict でも
+ * [{key,weight}] の配列でも受け取り、重み降順の配列に揃える。
+ */
+function normalizeStrategy(raw: unknown): TradingStrategy | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+
+  const indRaw = get(o, "indicators");
+  let indicators: TradingStrategyIndicator[] = [];
+  if (Array.isArray(indRaw)) {
+    indicators = (indRaw as Record<string, unknown>[])
+      .map((x) => ({ key: str(get(x, "key", "name")), weight: num(get(x, "weight")) }))
+      .filter((x) => x.key);
+  } else if (indRaw && typeof indRaw === "object") {
+    indicators = Object.entries(indRaw as Record<string, unknown>).map(([key, w]) => ({
+      key,
+      weight: num(w),
+    }));
+  }
+  indicators.sort((a, b) => b.weight - a.weight);
+
+  const vetoesRaw = get(o, "buy_vetoes", "buyVetoes");
+  const buyVetoes = Array.isArray(vetoesRaw)
+    ? (vetoesRaw as unknown[]).map(str).filter(Boolean)
+    : [];
+
+  const desc = get(o, "description");
+
+  return {
+    name: str(get(o, "name")) || "strategy",
+    benchmark: get(o, "benchmark") !== undefined ? str(get(o, "benchmark")) : null,
+    signalThreshold: num(get(o, "signal_threshold", "signalThreshold")),
+    strongSignalThreshold: num(get(o, "strong_signal_threshold", "strongSignalThreshold")),
+    indicators,
+    params: numberRecord(get(o, "params")),
+    buyVetoes,
+    exitRules: scalarRecord(get(o, "exit_rules", "exitRules")),
+    positionSizing: numberRecord(get(o, "position_sizing", "positionSizing")),
+    description: desc !== undefined ? str(desc) : null,
+  };
 }
 
 /**
@@ -107,5 +201,7 @@ export function normalizeTradingPayload(raw: unknown): TradingPayload {
       }))
     : [];
 
-  return { isLive: Boolean(o.is_live ?? o.isLive), summary, positions, trades };
+  const strategy = normalizeStrategy(o.strategy);
+
+  return { isLive: Boolean(o.is_live ?? o.isLive), summary, positions, trades, strategy };
 }

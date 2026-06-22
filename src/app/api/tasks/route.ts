@@ -31,7 +31,13 @@ export async function POST(req: NextRequest) {
   if (!session.userId) {
     return NextResponse.json({ error: "未ログインです" }, { status: 401 });
   }
-  let body: { title?: string; notes?: string; dueDate?: string | null; status?: string };
+  let body: {
+    title?: string;
+    notes?: string;
+    dueDate?: string | null;
+    status?: string;
+    recurrence?: string | null;
+  };
   try {
     body = await req.json();
   } catch {
@@ -46,6 +52,7 @@ export async function POST(req: NextRequest) {
     notes: body.notes ?? null,
     dueDate: body.dueDate ?? null,
     status: asStatus(body.status),
+    recurrence: body.recurrence || null,
   });
   return NextResponse.json({ task });
 }
@@ -62,6 +69,7 @@ export async function PATCH(req: NextRequest) {
     notes?: string | null;
     dueDate?: string | null;
     status?: string;
+    recurrence?: string | null;
   };
   try {
     body = await req.json();
@@ -76,6 +84,8 @@ export async function PATCH(req: NextRequest) {
     notes: body.notes,
     dueDate: body.dueDate,
     status: asStatus(body.status),
+    // 空文字は繰り返し解除 → null。未指定(undefined)は据え置き。
+    recurrence: body.recurrence === undefined ? undefined : body.recurrence || null,
   });
   if (!updated) {
     return NextResponse.json({ error: "タスクが見つかりません" }, { status: 404 });

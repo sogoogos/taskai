@@ -160,17 +160,22 @@ export const calendarTools: Anthropic.Tool[] = [
   {
     name: "create_task",
     description:
-      "新しい ToDo タスクを作成する。『〇〇をやることに追加』『今日中に△△する』『タスクで覚えておいて』など、時間が決まっていない『やること』を頼まれたら呼ぶ。日時が明確な予定は create_event を使う。dueDate は期日（YYYY-MM-DD、『今日』なら本日の日付）。複数頼まれたら1つずつ呼ぶ。",
+      "新しい ToDo タスクを作成する。『〇〇をやることに追加』『今日中に△△する』『タスクで覚えておいて』など、時間が決まっていない『やること』を頼まれたら呼ぶ。日時が明確な予定は create_event を使う。dueDate は期日（YYYY-MM-DD、『今日』なら本日の日付）。複数頼まれたら1つずつ呼ぶ。『毎月25日』『毎日』『毎週月曜』など繰り返しの『やること/期限』は recurrence に RRULE を入れる（このとき dueDate に初回の期日を必ず入れる。完了にすると自動で次回の期日へ繰り上がる）。時間が決まった繰り返しは create_event を使う。",
     input_schema: {
       type: "object",
       properties: {
         title: { type: "string", description: "タスク名" },
         notes: { type: "string", description: "メモ（任意）" },
-        dueDate: { type: "string", description: "期日 YYYY-MM-DD（任意。今日なら本日の日付）" },
+        dueDate: { type: "string", description: "期日 YYYY-MM-DD（任意。今日なら本日の日付。繰り返し時は初回の期日として必須）" },
         status: {
           type: "string",
           enum: ["todo", "doing", "done"],
           description: "状態（既定 todo）",
+        },
+        recurrence: {
+          type: "string",
+          description:
+            "繰り返しルール RRULE（任意）。毎月25日=RRULE:FREQ=MONTHLY;BYMONTHDAY=25、毎日=RRULE:FREQ=DAILY、平日=RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR、毎年=RRULE:FREQ=YEARLY。指定時は dueDate（初回期日）も必須。",
         },
       },
       required: ["title"],
@@ -179,7 +184,7 @@ export const calendarTools: Anthropic.Tool[] = [
   {
     name: "update_task",
     description:
-      "既存タスクを更新する。『〇〇を完了にして』『△△は着手中』『期日を明日に』など。先に list_tasks で対象の id を特定する。status は todo(未着手)/doing(着手中)/done(完了)。変更するフィールドだけ渡す。",
+      "既存タスクを更新する。『〇〇を完了にして』『△△は着手中』『期日を明日に』『毎月にして』など。先に list_tasks で対象の id を特定する。status は todo(未着手)/doing(着手中)/done(完了)。変更するフィールドだけ渡す。繰り返しタスク（recurrence あり）を status='done' にすると、完了扱いにはならず期日が自動で次回へ繰り上がり未着手に戻る。繰り返しを解除するには recurrence に空文字を渡す。",
     input_schema: {
       type: "object",
       properties: {
@@ -188,6 +193,11 @@ export const calendarTools: Anthropic.Tool[] = [
         notes: { type: "string" },
         dueDate: { type: "string", description: "期日 YYYY-MM-DD（null 文字列で期日なしに）" },
         status: { type: "string", enum: ["todo", "doing", "done"] },
+        recurrence: {
+          type: "string",
+          description:
+            "繰り返しルール RRULE。例 RRULE:FREQ=MONTHLY;BYMONTHDAY=25。空文字('')で繰り返しを解除。",
+        },
       },
       required: ["id"],
     },
@@ -276,6 +286,7 @@ export async function executeTool(
           notes: input.notes !== undefined ? String(input.notes) : undefined,
           dueDate: input.dueDate ? String(input.dueDate) : undefined,
           status: input.status ? (String(input.status) as TaskStatus) : undefined,
+          recurrence: input.recurrence ? String(input.recurrence) : undefined,
         });
       case "update_task": {
         const updated = await updateTask(userId, Number(input.id), {
@@ -288,6 +299,13 @@ export async function executeTool(
                 ? null
                 : String(input.dueDate),
           status: input.status ? (String(input.status) as TaskStatus) : undefined,
+          // 空文字('')は繰り返し解除 → null
+          recurrence:
+            input.recurrence === undefined
+              ? undefined
+              : input.recurrence === null || input.recurrence === ""
+                ? null
+                : String(input.recurrence),
         });
         if (!updated) throw new Error(`タスク id=${input.id} が見つかりません`);
         return updated;

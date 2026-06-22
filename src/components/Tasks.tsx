@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { describeRecurrence, parseRecurrence } from "@/lib/recurrence";
 
 type TaskStatus = "todo" | "doing" | "done";
 
@@ -10,9 +11,28 @@ interface Task {
   notes: string | null;
   status: TaskStatus;
   dueDate: string | null;
+  recurrence: string | null;
   createdAt: number;
   updatedAt: number;
   completedAt: number | null;
+}
+
+// 繰り返しプリセット（UI の選択肢 ↔ RRULE）。BYDAY/BYMONTHDAY は期日から導くので FREQ のみ。
+const RECUR_PRESETS: { value: string; label: string; rrule: string }[] = [
+  { value: "", label: "なし", rrule: "" },
+  { value: "DAILY", label: "毎日", rrule: "RRULE:FREQ=DAILY" },
+  { value: "WEEKLY", label: "毎週", rrule: "RRULE:FREQ=WEEKLY" },
+  { value: "MONTHLY", label: "毎月", rrule: "RRULE:FREQ=MONTHLY" },
+  { value: "YEARLY", label: "毎年", rrule: "RRULE:FREQ=YEARLY" },
+];
+
+/** 既存の RRULE → プリセット value（FREQ で対応付け。未対応は "" 扱い） */
+function recurValue(rule: string | null): string {
+  return parseRecurrence(rule)?.freq ?? "";
+}
+/** プリセット value → 保存する RRULE 文字列（"" は繰り返しなし） */
+function recurRrule(value: string): string {
+  return RECUR_PRESETS.find((p) => p.value === value)?.rrule ?? "";
 }
 
 function todayStr(): string {
@@ -57,12 +77,14 @@ export default function Tasks({
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [due, setDue] = useState<string>(todayStr());
+  const [recur, setRecur] = useState<string>("");
   const [scope, setScope] = useState<"today" | "all">("today");
   // インライン編集中のタスク
   const [editId, setEditId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDue, setEditDue] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [editRecur, setEditRecur] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,12 +108,14 @@ export default function Tasks({
   const add = useCallback(async () => {
     const t = title.trim();
     if (!t) return;
+    // 繰り返しは期日を起点にするので、期日なしの繰り返しは作らせない
+    const rrule = due ? recurRrule(recur) : "";
     setTitle("");
     try {
       const res = await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: t, dueDate: due || null }),
+        body: JSON.stringify({ title: t, dueDate: due || null, recurrence: rrule }),
       });
       if (!res.ok) throw new Error();
       await load();
@@ -100,10 +124,10 @@ export default function Tasks({
       setError("追加に失敗しました");
       setTitle(t);
     }
-  }, [title, due, load, onTasksChanged]);
+  }, [title, due, recur, load, onTasksChanged]);
 
   const patch = useCallback(
-    async (id: number, fields: Partial<Pick<Task, "status" | "title" | "dueDate" | "notes">>) => {
+    async (id: number, fields: Partial<Pick<Task, "status" | "title" | "dueDate" | "notes" | "recurrence">>) => {
       // 楽観的更新
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...fields } : t)));
       try {
@@ -145,6 +169,7 @@ export default function Tasks({
     setEditTitle(t.title);
     setEditDue(t.dueDate ?? "");
     setEditNotes(t.notes ?? "");
+    setEditRecur(recurValue(t.recurrence));
   }, []);
 
   const cancelEdit = useCallback(() => setEditId(null), []);
@@ -159,8 +184,10 @@ export default function Tasks({
       title,
       dueDate: editDue || null,
       notes: editNotes.trim() || null,
+      // 期日なしの繰り返しは無効（解除扱い）
+      recurrence: editDue ? recurRrule(editRecur) : "",
     });
-  }, [editId, editTitle, editDue, editNotes, patch]);
+  }, [editId, editTitle, editDue, editNotes, editRecur, patch]);
 
   const today = todayStr();
   const visible = useMemo(() => {
@@ -200,7 +227,7 @@ export default function Tasks({
             追加
           </button>
         </div>
-        <div className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--muted)]">
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-[var(--muted)]">
           <span>期日</span>
           <input
             type="date"
@@ -213,6 +240,20 @@ export default function Tasks({
               期日なし
             </button>
           )}
+          <span className="ml-1">繰り返し</span>
+          <select
+            value={recur}
+            onChange={(e) => setRecur(e.target.value)}
+            disabled={!due}
+            title={due ? undefined : "繰り返しには期日が必要です"}
+            className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] outline-none focus:border-[var(--accent)] disabled:opacity-40"
+          >
+            {RECUR_PRESETS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -292,7 +333,7 @@ export default function Tasks({
                   placeholder="メモ（任意）"
                   className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[11px] outline-none focus:border-[var(--accent)]"
                 />
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="date"
                     value={editDue}
@@ -307,6 +348,19 @@ export default function Tasks({
                       期日なし
                     </button>
                   )}
+                  <select
+                    value={editRecur}
+                    onChange={(e) => setEditRecur(e.target.value)}
+                    disabled={!editDue}
+                    title={editDue ? undefined : "繰り返しには期日が必要です"}
+                    className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[11px] outline-none focus:border-[var(--accent)] disabled:opacity-40"
+                  >
+                    {RECUR_PRESETS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.value === "" ? "繰り返しなし" : p.label}
+                      </option>
+                    ))}
+                  </select>
                   <span className="flex-1" />
                   <button
                     onClick={() => {
@@ -370,6 +424,9 @@ export default function Tasks({
                       {overdue ? "期限切れ " : "期日 "}
                       {dueLabel(t.dueDate)}
                     </span>
+                  )}
+                  {describeRecurrence(t.recurrence) && (
+                    <span className="text-[var(--accent)]">🔁 {describeRecurrence(t.recurrence)}</span>
                   )}
                   {t.notes && <span className="text-[var(--muted)]">・{t.notes}</span>}
                 </div>

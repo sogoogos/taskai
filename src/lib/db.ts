@@ -1,6 +1,7 @@
 import { createClient, type Client, type Row } from "@libsql/client";
 import fs from "node:fs";
 import path from "node:path";
+import { nextOccurrence } from "./recurrence";
 
 /**
  * libSQL クライアント。
@@ -76,6 +77,7 @@ const SCHEMA = `
     notes        TEXT,
     status       TEXT NOT NULL DEFAULT 'todo',
     due_date     TEXT,
+    recurrence   TEXT,
     sort_order   INTEGER NOT NULL DEFAULT 0,
     created_at   INTEGER NOT NULL,
     updated_at   INTEGER NOT NULL,
@@ -91,12 +93,23 @@ const SCHEMA = `
   );
 `;
 
+/** 既存DB向けの差分マイグレーション（列追加など）。重複追加は握りつぶす。 */
+async function migrate(c: Client): Promise<void> {
+  // tasks.recurrence は後から追加した列。既存テーブルに無ければ足す。
+  try {
+    await c.execute("ALTER TABLE tasks ADD COLUMN recurrence TEXT");
+  } catch {
+    // 既に存在する場合は "duplicate column" で失敗するので無視
+  }
+}
+
 /** スキーマ適用（プロセス内で一度だけ実行、以降は同じPromiseを待つ） */
 function ensureSchema(): Promise<void> {
   if (!globalForDb.__schemaReady) {
-    globalForDb.__schemaReady = getClient()
+    const c = getClient();
+    globalForDb.__schemaReady = c
       .executeMultiple(SCHEMA)
-      .then(() => undefined);
+      .then(() => migrate(c));
   }
   return globalForDb.__schemaReady;
 }
@@ -249,6 +262,7 @@ export interface TaskRow {
   notes: string | null;
   status: TaskStatus;
   dueDate: string | null; // 'YYYY-MM-DD'
+  recurrence: string | null; // RRULE 文字列（繰り返しタスク。完了で次回の期日へ繰り上がる）
   createdAt: number;
   updatedAt: number;
   completedAt: number | null;
@@ -265,6 +279,7 @@ function rowToTask(r: Row): TaskRow {
     notes: asString(r.notes),
     status: normalizeStatus(r.status),
     dueDate: asString(r.due_date),
+    recurrence: asString(r.recurrence),
     createdAt: Number(r.created_at),
     updatedAt: Number(r.updated_at),
     completedAt: asNumber(r.completed_at),
@@ -296,20 +311,27 @@ export async function getTask(userId: number, id: number): Promise<TaskRow | und
 
 export async function createTask(
   userId: number,
-  input: { title: string; notes?: string | null; dueDate?: string | null; status?: TaskStatus },
+  input: {
+    title: string;
+    notes?: string | null;
+    dueDate?: string | null;
+    status?: TaskStatus;
+    recurrence?: string | null;
+  },
 ): Promise<TaskRow> {
   const c = await db();
   const now = Date.now();
   const status = input.status ?? "todo";
   const ins = await c.execute({
-    sql: `INSERT INTO tasks (user_id, title, notes, status, due_date, sort_order, created_at, updated_at, completed_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO tasks (user_id, title, notes, status, due_date, recurrence, sort_order, created_at, updated_at, completed_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       userId,
       input.title,
       input.notes ?? null,
       status,
       input.dueDate ?? null,
+      input.recurrence ?? null,
       now,
       now,
       now,
@@ -324,9 +346,38 @@ export async function createTask(
 export async function updateTask(
   userId: number,
   id: number,
-  fields: { title?: string; notes?: string | null; dueDate?: string | null; status?: TaskStatus },
+  fields: {
+    title?: string;
+    notes?: string | null;
+    dueDate?: string | null;
+    status?: TaskStatus;
+    recurrence?: string | null;
+  },
 ): Promise<TaskRow | undefined> {
   const c = await db();
+
+  // 繰り返しタスクを「完了」にする場合は、完了させず期日を次回へ繰り上げて未着手に戻す。
+  // （完了→次回が自動で1件だけ出る挙動。UIのチェック/チャットの両方がここを通る）
+  if (fields.status === "done") {
+    const current = await getTask(userId, id);
+    if (!current) return undefined;
+    const rule = fields.recurrence !== undefined ? fields.recurrence : current.recurrence;
+    const baseDue = fields.dueDate !== undefined ? fields.dueDate : current.dueDate;
+    if (rule && baseDue) {
+      const next = nextOccurrence(rule, baseDue);
+      if (next) {
+        // status は todo に戻す。title/notes/recurrence の同時変更は反映する。
+        return updateTask(userId, id, {
+          title: fields.title,
+          notes: fields.notes,
+          recurrence: fields.recurrence,
+          dueDate: next,
+          status: "todo",
+        });
+      }
+    }
+  }
+
   const sets: string[] = [];
   const args: (string | number | null)[] = [];
   if (fields.title !== undefined) {
@@ -340,6 +391,10 @@ export async function updateTask(
   if (fields.dueDate !== undefined) {
     sets.push("due_date = ?");
     args.push(fields.dueDate);
+  }
+  if (fields.recurrence !== undefined) {
+    sets.push("recurrence = ?");
+    args.push(fields.recurrence);
   }
   if (fields.status !== undefined) {
     sets.push("status = ?");

@@ -68,6 +68,37 @@ describe("タスク DB CRUD", () => {
     const updated = await updateTask(u, t.id, { dueDate: null });
     expect(updated?.dueDate).toBeNull();
   });
+
+  it("繰り返しタスクを完了にすると、完了せず期日が次回へ繰り上がる", async () => {
+    const u = await makeUser("recur@example.com");
+    const t = await createTask(u, {
+      title: "給与振込期限",
+      dueDate: "2026-06-25",
+      recurrence: "RRULE:FREQ=MONTHLY;BYMONTHDAY=25",
+    });
+    expect(t.recurrence).toBe("RRULE:FREQ=MONTHLY;BYMONTHDAY=25");
+
+    const after = await updateTask(u, t.id, { status: "done" });
+    // 完了にはならず未着手のまま、期日だけ翌月へ
+    expect(after?.status).toBe("todo");
+    expect(after?.completedAt).toBeNull();
+    expect(after?.dueDate).toBe("2026-07-25");
+    expect(after?.recurrence).toBe("RRULE:FREQ=MONTHLY;BYMONTHDAY=25");
+  });
+
+  it("繰り返しを空文字で解除すると、完了が通常どおり効く", async () => {
+    const u = await makeUser("recur-off@example.com");
+    const t = await createTask(u, {
+      title: "毎日タスク",
+      dueDate: "2026-06-22",
+      recurrence: "RRULE:FREQ=DAILY",
+    });
+    const off = await updateTask(u, t.id, { recurrence: null });
+    expect(off?.recurrence).toBeNull();
+    const done = await updateTask(u, t.id, { status: "done" });
+    expect(done?.status).toBe("done");
+    expect(done?.completedAt).not.toBeNull();
+  });
 });
 
 describe("executeTool タスク系", () => {

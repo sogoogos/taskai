@@ -149,9 +149,6 @@ function MarketView({ item }: { item: StatusItem }) {
         </div>
       </div>
 
-      {/* 現在のシグナル */}
-      <SignalsView signals={p.signals} signalsAt={p.signalsAt} />
-
       {/* 保有銘柄 */}
       <div>
         <div className="mb-1 flex items-center justify-between">
@@ -191,6 +188,9 @@ function MarketView({ item }: { item: StatusItem }) {
           </div>
         )}
       </div>
+
+      {/* 現在のシグナル */}
+      <SignalsView signals={p.signals} signalsAt={p.signalsAt} />
 
       {/* 直近の売買 */}
       {p.trades.length > 0 && (
@@ -316,6 +316,34 @@ function SignalRow({ s }: { s: TradingSignal }) {
   );
 }
 
+// 折りたたみ前に見せる件数（買い/売りそれぞれ）
+const SIGNAL_PREVIEW = 5;
+
+function SignalGroup({ label, cls, signals }: { label: string; cls: string; signals: TradingSignal[] }) {
+  const [showAll, setShowAll] = useState(false);
+  if (signals.length === 0) return null;
+  const visible = showAll ? signals : signals.slice(0, SIGNAL_PREVIEW);
+  const hidden = signals.length - visible.length;
+  return (
+    <div className="space-y-1">
+      <div className={"text-[10px] font-medium " + cls}>
+        {label} {signals.length}件
+      </div>
+      {visible.map((s) => (
+        <SignalRow key={s.ticker} s={s} />
+      ))}
+      {signals.length > SIGNAL_PREVIEW && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          className="w-full rounded-lg border border-[var(--border)] py-1 text-[10px] text-[var(--muted)] transition hover:bg-[var(--surface-2)]"
+        >
+          {showAll ? "折りたたむ" : `他 ${hidden} 件を表示`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function SignalsView({ signals, signalsAt }: { signals: TradingSignal[]; signalsAt: string | null }) {
   const buys = signals.filter((s) => (SIGNAL_UI[s.signal]?.buy ?? false)).sort((a, b) => b.score - a.score);
   const sells = signals.filter((s) => !(SIGNAL_UI[s.signal]?.buy ?? true)).sort((a, b) => a.score - b.score);
@@ -331,22 +359,8 @@ function SignalsView({ signals, signalsAt }: { signals: TradingSignal[]; signals
         <p className="text-xs text-[var(--muted)]">今はシグナルが出ていません（または monitor 未送信）。</p>
       ) : (
         <div className="space-y-2">
-          {buys.length > 0 && (
-            <div className="space-y-1">
-              <div className="text-[10px] font-medium text-green-400">買い {buys.length}件</div>
-              {buys.map((s) => (
-                <SignalRow key={`b-${s.ticker}`} s={s} />
-              ))}
-            </div>
-          )}
-          {sells.length > 0 && (
-            <div className="space-y-1">
-              <div className="text-[10px] font-medium text-red-400">売り {sells.length}件</div>
-              {sells.map((s) => (
-                <SignalRow key={`s-${s.ticker}`} s={s} />
-              ))}
-            </div>
-          )}
+          <SignalGroup label="買い" cls="text-green-400" signals={buys} />
+          <SignalGroup label="売り" cls="text-red-400" signals={sells} />
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import UpdatePrompt from "@/components/UpdatePrompt";
 
 export const metadata: Metadata = {
   title: "TaskAI — チャットで予定管理",
@@ -27,7 +28,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body>
+        {children}
+        <UpdatePrompt />
+      </body>
     </html>
   );
 }

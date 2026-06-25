@@ -12,6 +12,14 @@ const BUILT = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
  *  - タップで location.reload()（HTMLは no-store、JSはハッシュ付きなので最新を取得） */
 export default function UpdatePrompt() {
   const [stale, setStale] = useState(false);
+  const [reloading, setReloading] = useState(false);
+
+  // 更新オーバーレイ（グルグル）を見せてから実際に再読み込みする
+  const reload = useCallback(() => {
+    setReloading(true);
+    // オーバーレイを描画させてから reload（即時だと表示前に遷移してしまう）
+    setTimeout(() => window.location.reload(), 50);
+  }, []);
 
   const check = useCallback(async () => {
     // ローカル開発(dev)では更新検知しない（常に一致扱い）
@@ -35,11 +43,20 @@ export default function UpdatePrompt() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [check]);
 
+  if (reloading) {
+    return (
+      <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-4 bg-[var(--background)]/90 backdrop-blur-sm">
+        <span className="h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-[var(--accent)]" />
+        <span className="text-sm text-[var(--muted)]">最新バージョンに更新しています…</span>
+      </div>
+    );
+  }
+
   if (!stale) return null;
 
   return (
     <button
-      onClick={() => window.location.reload()}
+      onClick={reload}
       className="fixed inset-x-0 bottom-0 z-50 flex w-full items-center justify-between gap-3 bg-[var(--accent)] px-5 pt-4 text-left text-white shadow-[0_-4px_20px_rgba(0,0,0,0.35)] transition hover:brightness-110 active:brightness-95 pb-[calc(1rem+env(safe-area-inset-bottom))]"
     >
       <span className="flex items-center gap-3">

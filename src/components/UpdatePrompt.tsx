@@ -17,8 +17,13 @@ export default function UpdatePrompt() {
   // 更新オーバーレイ（グルグル）を見せてから実際に再読み込みする
   const reload = useCallback(() => {
     setReloading(true);
-    // オーバーレイを描画させてから reload（即時だと表示前に遷移してしまう）
-    setTimeout(() => window.location.reload(), 50);
+    // 2フレーム待ってオーバーレイを確実に描画 → 少し回してから reload。
+    // （即時だとスピナーが見える前に遷移してしまう）
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        setTimeout(() => window.location.reload(), 700);
+      }),
+    );
   }, []);
 
   const check = useCallback(async () => {
@@ -45,9 +50,9 @@ export default function UpdatePrompt() {
 
   if (reloading) {
     return (
-      <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-4 bg-[var(--background)]/90 backdrop-blur-sm">
-        <span className="h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-[var(--accent)]" />
-        <span className="text-sm text-[var(--muted)]">最新バージョンに更新しています…</span>
+      <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-5 bg-[var(--background)]/95 backdrop-blur-sm">
+        <span className="h-16 w-16 animate-spin rounded-full border-[5px] border-white/15 border-t-[var(--accent)]" />
+        <span className="text-base font-medium text-[var(--text)]">最新バージョンに更新しています…</span>
       </div>
     );
   }

@@ -1,6 +1,5 @@
 "use client";
 
-// 更新バナーの動作確認用デプロイ（挙動に影響なし）
 import { useCallback, useEffect, useState } from "react";
 
 // ビルド時に焼き込まれた、この画面が動いている版（next.config.ts で注入）
@@ -42,10 +41,15 @@ export default function UpdatePrompt() {
     <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
       <button
         onClick={() => window.location.reload()}
-        className="flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white shadow-lg transition hover:brightness-110"
+        className="flex w-full max-w-md items-center justify-between gap-3 rounded-2xl bg-[var(--accent)] px-5 py-4 text-left text-white shadow-xl transition hover:brightness-110 active:brightness-95"
       >
-        <span>新しいバージョンがあります</span>
-        <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">タップで更新</span>
+        <span className="flex flex-col">
+          <span className="text-base font-semibold">新しいバージョンがあります</span>
+          <span className="text-xs text-white/80">タップして最新の表示に更新</span>
+        </span>
+        <span className="shrink-0 rounded-xl bg-white/20 px-4 py-2 text-sm font-semibold">
+          更新
+        </span>
       </button>
     </div>
   );

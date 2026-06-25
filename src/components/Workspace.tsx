@@ -44,7 +44,7 @@ export default function Workspace({
         {/* チャット: モバイルは active==chat のときのみ全画面。デスクトップは常時左に表示。 */}
         <div
           className={
-            "min-h-0 flex-col md:flex " + (active === "chat" ? "flex" : "hidden")
+            "min-h-0 min-w-0 flex-col md:flex " + (active === "chat" ? "flex" : "hidden")
           }
         >
           <Chat defaultProvider={defaultProvider} onCalendarChanged={onCalendarChanged} />
@@ -53,7 +53,7 @@ export default function Workspace({
         {/* 右カラム: モバイルは active!=chat のとき全画面。デスクトップは常時表示。 */}
         <div
           className={
-            "min-h-0 flex-col md:flex " + (active !== "chat" ? "flex" : "hidden")
+            "min-h-0 min-w-0 flex-col md:flex " + (active !== "chat" ? "flex" : "hidden")
           }
         >
           {/* デスクトップ用「予定｜タスク｜投資」トグル（モバイルは下部タブを使うので隠す） */}

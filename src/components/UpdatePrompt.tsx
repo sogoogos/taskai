@@ -38,19 +38,20 @@ export default function UpdatePrompt() {
   if (!stale) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-      <button
-        onClick={() => window.location.reload()}
-        className="flex w-full max-w-md items-center justify-between gap-3 rounded-2xl bg-[var(--accent)] px-5 py-4 text-left text-white shadow-xl transition hover:brightness-110 active:brightness-95"
-      >
+    <button
+      onClick={() => window.location.reload()}
+      className="fixed inset-x-0 bottom-0 z-50 flex w-full items-center justify-between gap-3 bg-[var(--accent)] px-5 pt-4 text-left text-white shadow-[0_-4px_20px_rgba(0,0,0,0.35)] transition hover:brightness-110 active:brightness-95 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+    >
+      <span className="flex items-center gap-3">
+        <span className="text-2xl leading-none">🔄</span>
         <span className="flex flex-col">
-          <span className="text-base font-semibold">新しいバージョンがあります</span>
-          <span className="text-xs text-white/80">タップして最新の表示に更新</span>
+          <span className="text-lg font-bold">新しいバージョンがあります</span>
+          <span className="text-sm text-white/85">タップして最新の表示に更新</span>
         </span>
-        <span className="shrink-0 rounded-xl bg-white/20 px-4 py-2 text-sm font-semibold">
-          更新
-        </span>
-      </button>
-    </div>
+      </span>
+      <span className="shrink-0 rounded-xl bg-white px-5 py-3 text-base font-bold text-[var(--accent)]">
+        更新
+      </span>
+    </button>
   );
 }

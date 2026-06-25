@@ -43,6 +43,9 @@ export default function Trading({ reloadSignal = 0 }: { reloadSignal?: number })
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "取得に失敗しました");
       const list: StatusItem[] = data.statuses ?? [];
+      // 表示順: 日本株(ライブ) → 日本株(ペーパー) → 米国株 → その他
+      const ORDER: Record<string, number> = { live: 0, jp: 1, us: 2 };
+      list.sort((a, b) => (ORDER[a.source] ?? 99) - (ORDER[b.source] ?? 99));
       setStatuses(list);
       setActive((cur) => cur ?? list[0]?.source ?? null);
     } catch (err) {

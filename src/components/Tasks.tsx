@@ -57,6 +57,15 @@ function dueLabel(due: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})`;
 }
 
+/** タイムスタンプ（ミリ秒）を「6/25(木) 14:30」形式へ。null は空文字。 */
+function stampLabel(ts: number | null): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const date = `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})`;
+  const time = `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${date} ${time}`;
+}
+
 // 状態の見た目（順送り: todo → doing → done → todo）
 const NEXT: Record<TaskStatus, TaskStatus> = { todo: "doing", doing: "done", done: "todo" };
 const STATUS_UI: Record<TaskStatus, { mark: string; cls: string; label: string }> = {
@@ -384,6 +393,15 @@ export default function Tasks({
                   >
                     保存
                   </button>
+                </div>
+                {/* 作成・更新・完了の時刻（記録済みのものだけ表示） */}
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 border-t border-[var(--border)] pt-1.5 text-[10px] text-[var(--muted)]">
+                  <span>作成 {stampLabel(t.createdAt)}</span>
+                  {t.completedAt ? (
+                    <span>完了 {stampLabel(t.completedAt)}</span>
+                  ) : (
+                    t.updatedAt > t.createdAt && <span>更新 {stampLabel(t.updatedAt)}</span>
+                  )}
                 </div>
               </div>
             );

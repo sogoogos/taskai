@@ -1,5 +1,6 @@
 "use client";
 
+// 更新バナーの動作確認用デプロイ（挙動に影響なし）
 import { useCallback, useEffect, useState } from "react";
 
 // ビルド時に焼き込まれた、この画面が動いている版（next.config.ts で注入）

@@ -104,7 +104,12 @@ export default function Tasks({
       if (!res.ok) throw new Error(data.error ?? "取得に失敗しました");
       setTasks(data.tasks ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "取得に失敗しました");
+      const msg = err instanceof Error ? err.message : "";
+      setError(
+        msg && !/failed to fetch/i.test(msg)
+          ? msg
+          : "通信に失敗しました。電波の良い場所で再試行してください。"
+      );
     } finally {
       setLoading(false);
     }
@@ -305,7 +310,18 @@ export default function Tasks({
 
       <div className="flex-1 space-y-1.5 overflow-y-auto p-3">
         {loading && <p className="text-xs text-[var(--muted)]">読み込み中…</p>}
-        {error && <p className="text-xs text-red-400">{error}</p>}
+        {error && (
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-red-400">{error}</p>
+            <button
+              onClick={load}
+              disabled={loading}
+              className="shrink-0 rounded-lg border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)] transition hover:bg-[var(--surface-2)] disabled:opacity-40"
+            >
+              再試行
+            </button>
+          </div>
+        )}
         {!loading && !error && visible.length === 0 && (
           <p className="text-xs text-[var(--muted)]">
             {scope === "today" ? "今日のタスクはありません" : "タスクはありません"}

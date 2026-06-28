@@ -44,8 +44,17 @@ export default function UpdatePrompt() {
     const onVisible = () => {
       if (document.visibilityState === "visible") check();
     };
+    // デスクトップではタブ/ウィンドウを開きっぱなしで visibilitychange が
+    // 起きにくいので、focus と定期ポーリングでも再チェックする。
+    const onFocus = () => check();
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    const timer = window.setInterval(check, 60_000); // 1分ごと
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(timer);
+    };
   }, [check]);
 
   if (reloading) {
